@@ -178,7 +178,7 @@ jobs:
                 status = 'completed';
                 conclusion = 'success';
                 title = 'Submodule Check Skipped';
-                summary = 'No submodules were updated in this PR, skipping submodule PR check.';
+                summary = `No submodules were updated in this PR, skipping submodule PR check. Submodule updated: ${submodule_updated}`;
               }
             } else {
               status = 'in_progress';
