@@ -176,7 +176,7 @@ jobs:
               checkRun.conclusion = conclusion;
             }
             
-            // await github.rest.checks.create(checkRun);
+            await github.rest.checks.create(checkRun);
       
       - name: Add PR label
         uses: actions/github-script@v7
