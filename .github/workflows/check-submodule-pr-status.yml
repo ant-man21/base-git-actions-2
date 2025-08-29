@@ -12,7 +12,7 @@ on:
 jobs:
   check-and-update:
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: write
       pull-requests: write
@@ -134,17 +134,7 @@ jobs:
                 );
                 
                 if (botComment) {
-                  const updatedComment = `## 🔗 Linked Submodule PR
-                  
-                  This PR is linked to a submodule PR:
-                  - **Submodule Repository:** \`${owner}/${repo}\`
-                  - **Submodule PR:** #${submodulePr.number}
-                  - **Status:** ✅ Closed - Ready to merge!
-                  
-                  ✅ **The linked submodule PR has been closed. This PR can now be merged.**
-                  
-                  ---
-                  *This comment was automatically updated by the status check workflow.*`;
+                  const updatedComment = `## 🔗 Linked Submodule PR\n\nThis PR is linked to a submodule PR:\n- **Submodule Repository:** \`${owner}/${repo}\`\n- **Submodule PR:** #${submodulePr.number}\n- **Status:** ✅ Closed - Ready to merge!\n\n✅ **The linked submodule PR has been closed. This PR can now be merged.**\n\n---\n*This comment was automatically updated by the status check workflow.*`;
                   
                   await github.rest.issues.updateComment({
                     owner: context.repo.owner,
