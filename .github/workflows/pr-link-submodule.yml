@@ -146,13 +146,63 @@ jobs:
             const found = '${{ steps.check_pr.outputs.found }}' === 'true';
             const prUrl = '${{ steps.check_pr.outputs.pr_url }}';
             
+            // Check if submodules were updated in this PR
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            // Get list of submodules from .gitmodules to check against
+            let submodulePaths = [];
+            try {
+              const { data: gitmodules } = await github.rest.repos.getContent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path: '.gitmodules',
+                ref: context.payload.pull_request.base.sha
+              });
+              
+              const content = Buffer.from(gitmodules.content, 'base64').toString();
+              const pathMatches = content.match(/path = (.+)/g);
+              if (pathMatches) {
+                submodulePaths = pathMatches.map(match => match.replace('path = ', '').trim());
+              }
+            } catch (error) {
+              console.log('No .gitmodules found or error reading it:', error.message);
+            }
+            
+            const submodule_updated = files.some(file => {
+              // Check if .gitmodules itself was modified
+              if (file.filename === '.gitmodules') {
+                return true;
+              }
+              
+              // Check if any known submodule paths were modified
+              return submodulePaths.some(submodulePath => {
+                return file.filename === submodulePath || file.filename.startsWith(submodulePath + '/');
+              });
+            });
+            
+            console.log(`Submodule updated: ${submodule_updated}`);
+
             let status, conclusion, title, summary;
             
             if (!found) {
-              status = 'completed';
-              conclusion = 'failure';
-              title = 'Submodule PR Not Found';
-              summary = `No open PR found in submodule repository for branch users/${{ steps.extract.outputs.ticket_num }}`;
+              // search to see if submodule was updated to begin with
+
+              if (submodule_updated) {
+                status = 'completed';
+                conclusion = 'failure';
+                title = 'Submodule PR Not Found';
+                summary = `Submodule was updated but no open PR found in submodule repository for branch users/${{ steps.extract.outputs.ticket_num }}`;
+              } else {
+                // No submodule updated, skip this check entirely
+                status = 'completed';
+                conclusion = 'success';
+                title = 'Submodule Check Skipped';
+                summary = `No submodules were updated in this PR, skipping submodule PR check. Submodule updated: ${submodule_updated}`;
+              }
             } else {
               status = 'in_progress';
               conclusion = undefined;
