@@ -12,9 +12,11 @@ on:
 jobs:
   check-and-update:
     runs-on: ubuntu-latest
+    
     permissions:
-      pull-requests: read
-      contents: read
+      contents: write
+      pull-requests: write
+      issues: write
       checks: write
       statuses: write
     
