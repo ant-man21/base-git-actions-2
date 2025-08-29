@@ -1,0 +1,249 @@
+# .github/workflows/auto-merge-with-submodule.yml
+name: Auto-merge with Submodule Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to merge'
+        required: true
+        type: number
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  auto-merge-and-update:
+    runs-on: ubuntu-latest
+    # Only run if PR was merged or manual trigger
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'users/'))
+    
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    
+    steps:
+      - name: Setup PR context
+        id: pr_context
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "pr_number=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
+            echo "manual_trigger=true" >> $GITHUB_OUTPUT
+          else
+            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "branch_name=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+            echo "manual_trigger=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Get PR information (for manual trigger)
+        if: steps.pr_context.outputs.manual_trigger == 'true'
+        id: get_pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: ${{ steps.pr_context.outputs.pr_number }}
+            });
+            
+            core.setOutput('branch_name', pr.data.head.ref);
+            core.setOutput('base_branch', pr.data.base.ref);
+      
+      - name: Extract ticket number
+        id: extract
+        run: |
+          if [ "${{ steps.pr_context.outputs.manual_trigger }}" == "true" ]; then
+            BRANCH_NAME="${{ steps.get_pr.outputs.branch_name }}"
+          else
+            BRANCH_NAME="${{ steps.pr_context.outputs.branch_name }}"
+          fi
+          
+          TICKET_NUM=$(echo "$BRANCH_NAME" | sed 's/users\///')
+          echo "ticket_num=$TICKET_NUM" >> $GITHUB_OUTPUT
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main  # Or your default branch
+      
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+      
+      - name: Get submodule info
+        id: submodule
+        run: |
+          SUBMODULE_PATH=$(git config --file .gitmodules --get-regexp path | awk '{ print $2 }' | head -1)
+          SUBMODULE_URL=$(git config --file .gitmodules --get-regexp url | awk '{ print $2 }' | head -1)
+          
+          if [[ $SUBMODULE_URL == git@github.com:* ]]; then
+            SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/git@github.com://' | sed 's/.git$//')
+          elif [[ $SUBMODULE_URL == https://github.com/* ]]; then
+            SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/https:\/\/github.com\///' | sed 's/.git$//')
+          else
+            echo "Unknown submodule URL format"
+            exit 1
+          fi
+          
+          echo "submodule_path=$SUBMODULE_PATH" >> $GITHUB_OUTPUT
+          echo "submodule_repo=$SUBMODULE_REPO" >> $GITHUB_OUTPUT
+      
+      - name: Check submodule PR status
+        id: check_submodule_pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const [owner, repo] = '${{ steps.submodule.outputs.submodule_repo }}'.split('/');
+            const branchName = 'users/${{ steps.extract.outputs.ticket_num }}';
+            
+            // Get all PRs (both open and closed) for this branch
+            const { data: prs } = await github.rest.pulls.list({
+              owner: owner,
+              repo: repo,
+              state: 'all',
+              head: `${owner}:${branchName}`,
+              sort: 'created',
+              direction: 'desc'
+            });
+            
+            if (prs.length === 0) {
+              core.setFailed('No submodule PR found for branch: ' + branchName);
+              return;
+            }
+            
+            const pr = prs[0];
+            
+            if (pr.state === 'open') {
+              core.setFailed('Submodule PR is still open. It must be closed before merging the base PR.');
+              return;
+            }
+            
+            core.setOutput('pr_closed', 'true');
+            core.setOutput('pr_merged', pr.merged.toString());
+            core.setOutput('pr_number', pr.number.toString());
+            console.log(`Submodule PR #${pr.number} is ${pr.state}, merged: ${pr.merged}`);
+      
+      - name: Merge submodule PR if not merged
+        if: steps.check_submodule_pr.outputs.pr_closed == 'true' && steps.check_submodule_pr.outputs.pr_merged == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const [owner, repo] = '${{ steps.submodule.outputs.submodule_repo }}'.split('/');
+            const prNumber = ${{ steps.check_submodule_pr.outputs.pr_number }};
+            
+            try {
+              // Attempt to merge the submodule PR
+              await github.rest.pulls.merge({
+                owner: owner,
+                repo: repo,
+                pull_number: prNumber,
+                merge_method: 'squash'
+              });
+              
+              console.log(`Successfully merged submodule PR #${prNumber}`);
+            } catch (error) {
+              console.log(`Could not auto-merge submodule PR: ${error.message}`);
+              console.log('Will proceed with updating to latest main branch');
+            }
+      
+      - name: Update submodule to latest main
+        run: |
+          cd ${{ steps.submodule.outputs.submodule_path }}
+          
+          # Fetch latest changes
+          git fetch origin main
+          
+          # Checkout and pull latest main
+          git checkout main
+          git pull origin main
+          
+          # Get the latest commit SHA
+          LATEST_SHA=$(git rev-parse HEAD)
+          echo "Latest submodule SHA: $LATEST_SHA"
+          
+          # Go back to base repo
+          cd ..
+          
+          # Stage the submodule update
+          git add ${{ steps.submodule.outputs.submodule_path }}
+          
+          # Check if there are changes
+          if git diff --cached --quiet; then
+            echo "Submodule is already up to date"
+          else
+            git commit -m "Update submodule to latest main (${LATEST_SHA:0:7})"
+            echo "submodule_updated=true" >> $GITHUB_ENV
+          fi
+      
+      - name: Merge feature branch
+        run: |
+          # Fetch the feature branch
+          git fetch origin ${{ steps.extract.outputs.branch_name }}
+          
+          # Create a temporary branch for merging
+          git checkout -b temp-merge-${{ steps.extract.outputs.ticket_num }}
+          
+          # Merge the feature branch with squash strategy
+          git merge --squash origin/${{ steps.extract.outputs.branch_name }}
+          
+          # Commit the squashed changes
+          git commit -m "Merge PR #${{ steps.pr_context.outputs.pr_number }}: ${{ steps.extract.outputs.branch_name }}" || echo "No changes to commit"
+      
+      - name: Push changes
+        run: |
+          # Push to main branch
+          git push origin HEAD:main
+      
+      - name: Clean up feature branch
+        run: |
+          # Delete the remote feature branch
+          git push origin --delete ${{ steps.extract.outputs.branch_name }} || echo "Branch already deleted"
+      
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ steps.pr_context.outputs.pr_number }};
+            const submoduleUpdated = '${{ env.submodule_updated }}' === 'true';
+            
+            let comment = `## ✅ Auto-merge Complete
+            
+            This PR has been successfully merged with the following actions:
+            - ✅ Base repository changes squash-merged to main
+            - ✅ Submodule PR verified as closed`;
+            
+            if (submoduleUpdated) {
+              comment += `\n- ✅ Submodule pointer updated to latest main branch`;
+            } else {
+              comment += `\n- ℹ️ Submodule already at latest main branch`;
+            }
+            
+            comment += `\n- ✅ Feature branch cleaned up
+            
+            No merge conflicts were created! 🎉
+            
+            ---
+            *This comment was automatically generated by the auto-merge workflow.*`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: comment
+            });

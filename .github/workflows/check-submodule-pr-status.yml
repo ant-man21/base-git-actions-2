@@ -1,0 +1,218 @@
+# .github/workflows/check-submodule-pr-status.yml
+name: Check Submodule PR Status
+
+on:
+  schedule:
+    # Run every 5 minutes to check for closed submodule PRs
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [submodule-pr-closed]
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      contents: read
+      checks: write
+      statuses: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+      
+      - name: Get submodule info
+        id: submodule
+        run: |
+          SUBMODULE_PATH=$(git config --file .gitmodules --get-regexp path | awk '{ print $2 }' | head -1)
+          SUBMODULE_URL=$(git config --file .gitmodules --get-regexp url | awk '{ print $2 }' | head -1)
+          
+          if [[ $SUBMODULE_URL == git@github.com:* ]]; then
+            SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/git@github.com://' | sed 's/.git$//')
+          elif [[ $SUBMODULE_URL == https://github.com/* ]]; then
+            SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/https:\/\/github.com\///' | sed 's/.git$//')
+          else
+            echo "Unknown submodule URL format"
+            exit 1
+          fi
+          
+          echo "submodule_repo=$SUBMODULE_REPO" >> $GITHUB_OUTPUT
+      
+      - name: Find open PRs with users/* branches
+        id: find_prs
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Get all open PRs with users/* branches
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+            
+            const userPrs = prs.filter(pr => pr.head.ref.startsWith('users/'));
+            
+            if (userPrs.length === 0) {
+              console.log('No open PRs with users/* branches found');
+              core.setOutput('has_prs', 'false');
+              return;
+            }
+            
+            core.setOutput('has_prs', 'true');
+            core.setOutput('prs', JSON.stringify(userPrs.map(pr => ({
+              number: pr.number,
+              branch: pr.head.ref,
+              sha: pr.head.sha
+            }))));
+      
+      - name: Check each PR's submodule status
+        if: steps.find_prs.outputs.has_prs == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prs = JSON.parse('${{ steps.find_prs.outputs.prs }}');
+            const [owner, repo] = '${{ steps.submodule.outputs.submodule_repo }}'.split('/');
+            
+            for (const pr of prs) {
+              const ticketNum = pr.branch.replace('users/', '');
+              const submoduleBranch = `users/${ticketNum}`;
+              
+              console.log(`Checking PR #${pr.number} (${pr.branch})`);
+              
+              // Check for submodule PR
+              const { data: submodulePrs } = await github.rest.pulls.list({
+                owner: owner,
+                repo: repo,
+                state: 'all',
+                head: `${owner}:${submoduleBranch}`,
+                sort: 'created',
+                direction: 'desc'
+              });
+              
+              if (submodulePrs.length === 0) {
+                console.log(`  No submodule PR found for ${submoduleBranch}`);
+                continue;
+              }
+              
+              const submodulePr = submodulePrs[0];
+              console.log(`  Submodule PR #${submodulePr.number} is ${submodulePr.state}`);
+              
+              // Get existing check runs
+              const { data: checkRuns } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: pr.sha,
+                check_name: 'Submodule PR Status'
+              });
+              
+              let status, conclusion, title, summary;
+              
+              if (submodulePr.state === 'closed') {
+                status = 'completed';
+                conclusion = 'success';
+                title = 'Submodule PR Closed';
+                summary = `✅ Submodule PR #${submodulePr.number} has been closed. This PR can now be merged.`;
+                
+                // Update PR comment
+                const { data: comments } = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number
+                });
+                
+                const botComment = comments.find(comment => 
+                  comment.user.type === 'Bot' && 
+                  comment.body.includes('Linked Submodule PR')
+                );
+                
+                if (botComment) {
+                  const updatedComment = `## 🔗 Linked Submodule PR
+                  
+                  This PR is linked to a submodule PR:
+                  - **Submodule Repository:** \`${owner}/${repo}\`
+                  - **Submodule PR:** #${submodulePr.number}
+                  - **Status:** ✅ Closed - Ready to merge!
+                  
+                  ✅ **The linked submodule PR has been closed. This PR can now be merged.**
+                  
+                  ---
+                  *This comment was automatically updated by the status check workflow.*`;
+                  
+                  await github.rest.issues.updateComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: botComment.id,
+                    body: updatedComment
+                  });
+                }
+                
+                // Update labels
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    name: 'submodule-linked'
+                  });
+                } catch (e) {
+                  console.log('Could not remove label');
+                }
+                
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  labels: ['ready-to-merge']
+                });
+                
+              } else {
+                status = 'in_progress';
+                title = 'Waiting for Submodule PR';
+                summary = `⏳ Waiting for submodule PR #${submodulePr.number} to be closed before allowing merge.`;
+              }
+              
+              // Create or update check run
+              if (checkRuns.check_runs.length > 0) {
+                const checkRun = checkRuns.check_runs[0];
+                const updateParams = {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  check_run_id: checkRun.id,
+                  status: status,
+                  output: {
+                    title: title,
+                    summary: summary
+                  }
+                };
+                
+                if (conclusion) {
+                  updateParams.conclusion = conclusion;
+                }
+                
+                await github.rest.checks.update(updateParams);
+              } else {
+                const createParams = {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: 'Submodule PR Status',
+                  head_sha: pr.sha,
+                  status: status,
+                  output: {
+                    title: title,
+                    summary: summary
+                  }
+                };
+                
+                if (conclusion) {
+                  createParams.conclusion = conclusion;
+                }
+                
+                await github.rest.checks.create(createParams);
+              }
+            }
