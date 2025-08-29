@@ -168,7 +168,7 @@ jobs:
             if (!found) {
               // search to see if submodule was updated to begin with
 
-              if (submodule_updated) {
+              if (!submodule_updated) {
                 status = 'completed';
                 conclusion = 'failure';
                 title = 'Submodule PR Not Found';
