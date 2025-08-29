@@ -153,12 +153,35 @@ jobs:
               pull_number: context.issue.number
             });
             
+            // Get list of submodules from .gitmodules to check against
+            let submodulePaths = [];
+            try {
+              const { data: gitmodules } = await github.rest.repos.getContent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path: '.gitmodules',
+                ref: context.payload.pull_request.base.sha
+              });
+              
+              const content = Buffer.from(gitmodules.content, 'base64').toString();
+              const pathMatches = content.match(/path = (.+)/g);
+              if (pathMatches) {
+                submodulePaths = pathMatches.map(match => match.replace('path = ', '').trim());
+              }
+            } catch (error) {
+              console.log('No .gitmodules found or error reading it:', error.message);
+            }
+            
             const submodule_updated = files.some(file => {
-              // Check for .gitmodules changes or submodule directory changes
-              // You can also check for specific submodule paths if you know them
-              return file.filename === '.gitmodules' || 
-                    file.status === 'modified' && file.additions === 1 && file.deletions === 1;
-              // The additions/deletions pattern is typical for submodule hash updates
+              // Check if .gitmodules itself was modified
+              if (file.filename === '.gitmodules') {
+                return true;
+              }
+              
+              // Check if any known submodule paths were modified
+              return submodulePaths.some(submodulePath => {
+                return file.filename === submodulePath || file.filename.startsWith(submodulePath + '/');
+              });
             });
             
             console.log(`Submodule updated: ${submodule_updated}`);
@@ -168,7 +191,7 @@ jobs:
             if (!found) {
               // search to see if submodule was updated to begin with
 
-              if (!submodule_updated) {
+              if (submodule_updated) {
                 status = 'completed';
                 conclusion = 'failure';
                 title = 'Submodule PR Not Found';
