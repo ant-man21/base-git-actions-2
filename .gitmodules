@@ -1,0 +1,3 @@
+[submodule "submodule-git-actions-2"]
+	path = submodule-git-actions-2
+	url = https://github.com/ant-man21/submodule-git-actions-2.git
