@@ -134,8 +134,7 @@ jobs:
                 );
                 
                 if (botComment) {
-                  const updatedComment = `## 🔗 Linked Submodule PR\n\nThis PR is linked to a submodule PR:\n- **Submodule Repository:** \`${owner}/${repo}\`\n- **Submodule PR:** [#${submodulePr.number}](${submodulePr.html_url})\n- **Status:** ✅ Closed - Ready to merge!\n\n✅ **The linked submodule PR has been closed. This PR can now be merged.**\n\n---\n*This comment was automatically updated by the status check workflow.*`;
-                  
+                  const updatedComment = `## 🔗 Linked Submodule PR\n\nThis PR is linked to a submodule PR:\n- **Submodule Repository:** \`${owner}/${repo}\`\n- **Submodule PR:** [#${submodulePr.number}](${submodulePr.html_url})\n- **Status:** ✅ Closed - Ready to merge!\n\n✅ **The linked submodule PR has been closed. This PR can now be merged.**\n\n---\n*This comment was automatically updated by the status check workflow.*`;                  
                   await github.rest.issues.updateComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
