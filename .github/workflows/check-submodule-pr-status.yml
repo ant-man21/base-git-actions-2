@@ -92,7 +92,7 @@ jobs:
                 owner: owner,
                 repo: repo,
                 state: 'all',
-                head: `${owner}:${submoduleBranch}`,
+                head: submoduleBranch,
                 sort: 'created',
                 direction: 'desc'
               });
