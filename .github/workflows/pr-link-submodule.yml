@@ -300,7 +300,7 @@ jobs:
             const submodulePrUrl = '${{ steps.check_pr.outputs.pr_url }}';
             const submoduleRepo = '${{ steps.submodule.outputs.submodule_repo }}';
             const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
-            console.log(`Label: ${label}, Submodule PR Status: ${isApproved}`);
+            console.log(`Submodule PR Status: ${isApproved}`);
             var comment = "";
             if(isApproved) {
               comment = `## 🔗 Linked Submodule PR
