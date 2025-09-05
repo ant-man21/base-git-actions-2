@@ -5,3 +5,7 @@ TODO
   - [ ] what about multiple submodules?
   - [x] fix comment formatting
   - [ ] scalability? is polling a good option every 5 minutes?
+  - [ ] create PR drafts automatically
+  - [ ] change base PR check for submodule PRs.
+      - Right now it is: check submodule PR exists and is closed
+      - New: check is submodule PR exists, is opened, and is approved
