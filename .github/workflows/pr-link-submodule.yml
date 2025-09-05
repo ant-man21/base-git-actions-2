@@ -279,7 +279,6 @@ jobs:
                 }
               }
             }
-            // ^ instead of this. I want to not check if it exists and is closed. I want to check if it exists, is open, and is approved
             
             const checkRun = {
               owner: context.repo.owner,
