@@ -271,7 +271,7 @@ jobs:
                       const { data: comments } = await github.rest.issues.listComments({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
-                        issue_number: pr.number
+                        issue_number: context.issue.number
                       });
                       console.log(`Comments: ${comments.length}`);
                       
@@ -296,7 +296,7 @@ jobs:
                         await github.rest.issues.removeLabel({
                           owner: context.repo.owner,
                           repo: context.repo.repo,
-                          issue_number: pr.number,
+                          issue_number: context.issue.number,
                           name: 'submodule-linked'
                         });
                       } catch (e) {
@@ -306,7 +306,7 @@ jobs:
                       await github.rest.issues.addLabels({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
-                        issue_number: pr.number,
+                        issue_number: context.issue.number,
                         labels: ['ready-to-merge']
                       });  
 
