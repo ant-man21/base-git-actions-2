@@ -276,6 +276,7 @@ jobs:
                         comment.user.type === 'Bot' && 
                         comment.body.includes('Linked Submodule PR')
                       );
+                      console.log(`Bot Comment: ${botComment}`);
                       
                       if (botComment) {
                         const updatedComment = `## 🔗 Linked Submodule PR\n\nThis PR is linked to a submodule PR:\n- **Submodule Repository:** \`${owner}/${repo}\`\n- **Submodule PR:** ${submodulePrUrl}\n- **Status:** ✅ Closed - Ready to merge!\n\n✅ **The linked submodule PR has been approved. This PR can now be merged.**\n\n---\n*This comment was automatically updated by the status check workflow.*`;                  
