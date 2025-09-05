@@ -4,8 +4,9 @@ TODO
   - [x] check to see if no submodules if it still works. (works) 
   - [ ] what about multiple submodules?
   - [x] fix comment formatting
-  - [ ] scalability? is polling a good option every 5 minutes?
+  - [x] scalability? is polling a good option every 5 minutes? (fixed with new fixes)
   - [ ] create PR drafts automatically
-  - [ ] change base PR check for submodule PRs.
+  - [x] change base PR check for submodule PRs.
       - Right now it is: check submodule PR exists and is closed
       - New: check is submodule PR exists, is opened, and is approved
+  - [ ] type /merge in base PR to close PR (and submodule PRs) and automatically merge base and submodules (fixes submodule conflicts)
