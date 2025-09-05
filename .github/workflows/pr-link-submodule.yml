@@ -15,9 +15,11 @@ jobs:
     if: startsWith(github.head_ref, 'users/')
     
     permissions:
-      pull-requests: write
       contents: write
+      pull-requests: write
+      issues: write
       checks: write
+      statuses: write
     
     steps:
       - name: Checkout repository
@@ -271,6 +273,7 @@ jobs:
                         repo: context.repo.repo,
                         issue_number: pr.number
                       });
+                      console.log(`Comments: ${comments.length}`);
                       
                       const botComment = comments.find(comment => 
                         comment.user.type === 'Bot' && 
