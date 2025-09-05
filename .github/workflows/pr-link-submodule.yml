@@ -271,17 +271,6 @@ jobs:
 
             // Update labels
             if(isApproved) {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  name: 'submodule-linked'
-                });
-              } catch (e) {
-                console.log('Could not remove label');
-              }
-              
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -317,6 +306,7 @@ jobs:
             } else {
               comment = `## 🔗 Linked Submodule PR\n\nThis PR is linked to a submodule PR:\n- **Submodule Repository:** \`${submoduleRepo}\`\n- **Submodule PR:** ${submodulePrUrl}\n- **Status:** ✅ Closed - Ready to merge!\n\n✅ **The linked submodule PR has been closed. This PR can now be merged.**\n\n---\n*This comment was automatically updated by the status check workflow.*`;                  
             }
+            console.log(comment);
             
             // Check if we already commented
             const { data: comments } = await github.rest.issues.listComments({
@@ -324,13 +314,16 @@ jobs:
               repo: context.repo.repo,
               issue_number: prNumber
             });
+            console.log("number of comments: " + comments.length);
             
             const botComment = comments.find(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('Linked Submodule PR')
             );
+            console.log(botComment);
             
             if (botComment) {
+              console.log('Comment already exists');
               // Update existing comment
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -339,6 +332,7 @@ jobs:
                 body: comment
               });
             } else {
+              console.log('Comment does not exist');
               // Create new comment
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
