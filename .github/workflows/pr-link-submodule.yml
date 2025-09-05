@@ -283,10 +283,10 @@ jobs:
                       
                       if (botComment) {
                         const updatedComment = `## 🔗 Linked Submodule PR\n\nThis PR is linked to a submodule PR:\n- **Submodule Repository:** \`${owner}/${repo}\`\n- **Submodule PR:** ${submodulePrUrl}\n- **Status:** ✅ Closed - Ready to merge!\n\n✅ **The linked submodule PR has been approved. This PR can now be merged.**\n\n---\n*This comment was automatically updated by the status check workflow.*`;                  
-                        await github.rest.issues.updateComment({
+                        await github.rest.issues.createComment({
                           owner: context.repo.owner,
                           repo: context.repo.repo,
-                          comment_id: botComment.id,
+                          issue_number: context.issue.number,
                           body: updatedComment
                         });
                       }
