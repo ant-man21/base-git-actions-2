@@ -141,6 +141,7 @@ jobs:
             }
       
       - name: Create check run for submodule PR status
+        id: antman
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -148,6 +149,7 @@ jobs:
             const found = '${{ steps.check_pr.outputs.found }}' === 'true';
             const prUrl = '${{ steps.check_pr.outputs.pr_url }}';
             const submodulePrUrl = '${{ steps.check_pr.outputs.pr_url }}';
+            core.setOutput('is_approved', isApproved.toString());
             
             // Check if submodules were updated in this PR
             const { data: files } = await github.rest.pulls.listFiles({
@@ -291,25 +293,6 @@ jobs:
                         });
                       }
 
-                      // Update labels
-                      try {
-                        await github.rest.issues.removeLabel({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          issue_number: pr.number,
-                          name: 'submodule-linked'
-                        });
-                      } catch (e) {
-                        console.log('Could not remove label');
-                      }
-                      
-                      await github.rest.issues.addLabels({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        issue_number: pr.number,
-                        labels: ['ready-to-merge']
-                      });  
-
                     } else {
                       status = 'in_progress';
                       conclusion = undefined;
@@ -352,6 +335,8 @@ jobs:
           script: |
             const found = '${{ steps.check_pr.outputs.found }}' === 'true';
             const label = found ? 'submodule-linked' : 'submodule-pending';
+            const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
+            console.log(`Label: ${label}, Approved: ${isApproved}`);
             
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
@@ -359,3 +344,24 @@ jobs:
               issue_number: context.issue.number,
               labels: [label]
             });
+
+            // Update labels
+            if(isApproved) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: 'submodule-linked'
+                });
+              } catch (e) {
+                console.log('Could not remove label');
+              }
+              
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: ['ready-to-merge']
+              });  
+            };
