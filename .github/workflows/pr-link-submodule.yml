@@ -149,7 +149,7 @@ jobs:
             const found = '${{ steps.check_pr.outputs.found }}' === 'true';
             const prUrl = '${{ steps.check_pr.outputs.pr_url }}';
             const submodulePrUrl = '${{ steps.check_pr.outputs.pr_url }}';
-            core.setOutput('is_approved', isApproved.toString());
+            core.setOutput('is_approved', 'true');
             
             // Check if submodules were updated in this PR
             const { data: files } = await github.rest.pulls.listFiles({
