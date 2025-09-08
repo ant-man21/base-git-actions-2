@@ -1,0 +1,36 @@
+name: Merge Command Handler
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  handle-merge-command:
+    if: github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for /merge command
+        id: check
+        run: |
+          comment_body="${{ github.event.comment.body }}"
+          if [[ "$comment_body" == "/merge" ]]; then
+            echo "found_merge=true" >> $GITHUB_OUTPUT
+          else
+            echo "found_merge=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Print placeholder message
+        if: steps.check.outputs.found_merge == 'true'
+        run: echo "📝 Detected /merge command. Placeholder for merge implementation."
+
+      - name: Delete comment
+        if: steps.check.outputs.found_merge == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.deleteComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id
+            })
