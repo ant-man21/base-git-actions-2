@@ -78,11 +78,13 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 comment_id: botComment.id,
-                body: "Pull Request Merged ✅"           
+                body: "Pull Request Merged ✅" 
+              });          
             } else {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 comment_id: botComment.id,
-                body: "Pull Request Not Merged ❌\nError: ?"     
+                body: "Pull Request Not Merged ❌\nError: ?"
+              });    
             }
