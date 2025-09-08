@@ -18,10 +18,10 @@ Instead of manually linking PRs together, and manually merging them, the goal of
 - Proceed as a typical single Repo PR (approvals, merge conflicts) and merge with Green merge button
 
 TODO
-  - [ ] automerge does not work. it triggers after base repo merges but gets error
+  - [ ] automerge does not work. it triggers after seeing /merge comment but gets error
   - [ ] what about multiple submodules?
       - at the moment it only looks for the first submodule added to this repository. do we want it to hard look for certain submodules? should it just automatically find them?
-  - [ ] type /merge in base PR to close PR (and submodule PRs) and automatically merge base and submodules (fixes submodule conflicts)
+  - [x] type /merge handling in base PR to close PR
   - [ ] create PR drafts automatically (this is a nice to have imo)
 
 DONE
