@@ -32,5 +32,3 @@ DONE
       - New: check is submodule PR exists, is opened, and is approved
   - [x] fix comment formatting
   - [x] scalability? is polling a good option every 5 minutes? (fixed with new fixes)
-
-Duplicate Line Change goes here!
