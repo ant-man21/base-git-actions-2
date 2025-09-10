@@ -339,7 +339,6 @@ jobs:
                 body: comment
               });
             }
-jobs:
   check-submodule-pointers:
     runs-on: ubuntu-latest
     name: Validate Submodule Pointers
