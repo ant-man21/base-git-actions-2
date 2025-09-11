@@ -117,6 +117,7 @@ jobs:
 
     strategy:
       # Process up to 5 submodules in parallel (adjust as needed)
+      fail-fast: false
       max-parallel: 5
       matrix: ${{ fromJson(needs.discover-submodules.outputs.matrix) }}
     
@@ -353,7 +354,7 @@ jobs:
             const submoduleRepo = '${{ matrix.repo_name }}';
             const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
             console.log(`Submodule PR Status: ${isApproved}`);
-            const comment = `🔗 Linked Submodule PR: [\`${submoduleRepo}\`](${submodulePrUrl})`;
+            const comment = `🔗 Linked Submodule PR: [\`${submoduleRepo}\`](${submodulePrUrl})\nStatus = ⏳`;
             
             // Check if we already commented
             const { data: comments } = await github.rest.issues.listComments({
@@ -537,6 +538,7 @@ jobs:
             console.log("found =");
             console.log(found);
             const title = "title";
+            const summary = "summary";
             const status = 'completed';
             const conclusion = 'failure';
 
