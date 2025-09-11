@@ -365,7 +365,7 @@ jobs:
             
             const botComment = comments.find(comment => 
               comment.user.type === 'Bot' && 
-              comment.body.includes(comment)
+              comment.body.includes(`🔗 Linked Submodule PR: [\`${submoduleRepo}\`]`)
             );
             
             if (botComment) {
@@ -393,7 +393,9 @@ jobs:
           script: |
             const isFound = '${{ steps.check_pr.outputs.found }}' === 'true';
             const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
-            if (isFound === "true" && isApproved === "true") {
+            console.log(isFound);
+            console.log(isApproved);
+            if (isFound === 'true' && isApproved === 'true') {
               console.log("✅ Success");
               // Exit 0 means success
               process.exit(0);
@@ -525,20 +527,6 @@ jobs:
     if: always() && needs.discover-submodules.outputs.has-submodules == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Collect processing results
-        run: |
-          echo "Finished processing all submodules"
-          echo "Submodule processing status: ${{ needs.link-and-validate.result }}"
-          
-          # You can add logic here to:
-          # - Aggregate results from all parallel jobs
-          # - Create summary comments
-          # - Handle any failures
-          
-          if [[ "${{ needs.link-and-validate.result }}" == "failure" ]]; then
-            echo "Some submodule processing failed"
-            exit 1
-          fi
       
       - name: Submodules PR Status
         uses: actions/github-script@v7
