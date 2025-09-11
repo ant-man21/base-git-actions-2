@@ -206,7 +206,7 @@ jobs:
   # Job 4: Collect results (optional)
   # Then create a dependent job that collects all results:
   collect-and-report:
-    needs: [check-submodule-prs] # Your matrix job name
+    needs: [link-and-validate] # Your matrix job name
     runs-on: ubuntu-latest
     if: always() # Run even if some matrix jobs fail
     steps:
@@ -215,7 +215,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const matrixResults = ${{ toJSON(needs.check-submodule-prs.outputs) }};
+            const matrixResults = ${{ toJSON(needs.link-and-validate.outputs) }};
             const results = [];
             
             // Process each matrix job result
