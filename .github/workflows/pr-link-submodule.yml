@@ -402,15 +402,14 @@ jobs:
             const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
             console.log(isFound);
             console.log(isApproved);
-            if (isFound === 'true' && isApproved === 'true') {
+            if (isFound === true && isApproved === true) {
               console.log("✅ Success");
-              // Exit 0 means success
               process.exit(0);
             } else {
               console.error("❌ Failed");
-              // Exit 1 means failure
               process.exit(1);
-            } 
+            }
+
 
   #Job 3: Check Submodule Pointers
   check-submodule-pointers:
