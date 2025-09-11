@@ -541,7 +541,10 @@ jobs:
           fi
       
       - name: Submodules PR Status
-        script: |
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
             const found = '${{ needs.link-and-validate.result }}' === 'true';
             console.log("found =");
             console.log(found);
