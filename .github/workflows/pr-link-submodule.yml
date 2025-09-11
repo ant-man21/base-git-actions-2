@@ -520,21 +520,21 @@ jobs:
 
   # Job 4: Collect results (optional)
   collect-results:
-    needs: [discover-submodules, process-submodules]
+    needs: [discover-submodules, link-and-validate]
     if: always() && needs.discover-submodules.outputs.has-submodules == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Collect processing results
         run: |
           echo "Finished processing all submodules"
-          echo "Submodule processing status: ${{ needs.process-submodules.result }}"
+          echo "Submodule processing status: ${{ needs.link-and-validate.result }}"
           
           # You can add logic here to:
           # - Aggregate results from all parallel jobs
           # - Create summary comments
           # - Handle any failures
           
-          if [[ "${{ needs.process-submodules.result }}" == "failure" ]]; then
+          if [[ "${{ needs.link-and-validate.result }}" == "failure" ]]; then
             echo "Some submodule processing failed"
             exit 1
           fi
