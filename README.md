@@ -19,12 +19,14 @@ Instead of manually linking PRs together, and manually merging them, the goal of
 
 TODO
   - [ ] automerge does not work. it triggers after seeing /merge comment but gets error
-  - [ ] what about multiple submodules?
-      - at the moment it only looks for the first submodule added to this repository. do we want it to hard look for certain submodules? should it just automatically find them?
-  - [x] type /merge handling in base PR to close PR
   - [ ] create PR drafts automatically (this is a nice to have imo)
+  - [ ] clean up comment generation and checks. Not very user friendly
+  - [ ] look into any nuances.
 
 DONE
+  - [x] what about multiple submodules?
+      - at the moment it only looks for the first submodule added to this repository. do we want it to hard look for certain submodules? should it just automatically find them?
+  - [x] type /merge handling in base PR to close PR
   - [x] need to validate pr process and it works properly. (simple examples work. comment formatting is off and needs love)
   - [x] check to see if no submodules if it still works. (works) 
   - [x] change base PR check for submodule PRs.
