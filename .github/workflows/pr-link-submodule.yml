@@ -529,38 +529,20 @@ jobs:
 
   # Job 4: Collect results (optional)
   collect-results:
+    name: Submodule PR Status  # This makes the job show with your custom name
     needs: [discover-submodules, link-and-validate]
     if: always() && needs.discover-submodules.outputs.has-submodules == 'true'
     runs-on: ubuntu-latest
     steps:
-      
-      - name: Submodules PR Status
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const found = '${{ needs.link-and-validate.result }}' === 'true';
-            console.log("found =");
-            console.log(found);
-            const title = "title";
-            const summary = "summary";
-            const status = 'completed';
-            const conclusion = 'failure';
-
-            const checkRun = {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'Submodule PR Status',
-              head_sha: context.payload.pull_request.head.sha,
-              status: status,
-              output: {
-                title: title,
-                summary: summary
-              }
-            };
-            
-            if (conclusion) {
-              checkRun.conclusion = conclusion;
-            }
-            
-            await github.rest.checks.create(checkRun);
+      # Don't create a separate check - just use job summary
+      - name: Generate Report
+        run: |
+          found="${{ needs.link-and-validate.result == 'success' }}"
+          if [ "$found" = "true" ]; then
+            echo "## ✅ All Submodules Valid" >> $GITHUB_STEP_SUMMARY
+            echo "All submodule PRs are properly linked" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Submodule Issues Found" >> $GITHUB_STEP_SUMMARY
+            echo "Some submodules have issues" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
