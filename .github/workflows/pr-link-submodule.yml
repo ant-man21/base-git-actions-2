@@ -230,12 +230,16 @@ jobs:
                 conclusion = 'failure';
                 title = 'Submodule PR Not Found';
                 summary = `Submodule was updated but no open PR found in submodule repository for branch users/${{ steps.extract.outputs.ticket_num }}`;
+                console.error("❌ Failed");
+                process.exit(1);
               } else {
                 // No submodule updated, skip this check entirely
                 status = 'completed';
                 conclusion = 'success';
                 title = 'Submodule Check Skipped';
-                summary = `No submodules were updated in this PR, skipping submodule PR check. Submodule updated: ${submodule_updated}`;
+                //summary = `No submodules were updated in this PR, skipping submodule PR check. Submodule updated: ${submodule_updated}`;
+                //console.error("✅ Skipping submodule");
+                process.exit(0);
               }
             } else {
               // PR found - now check if it's open and approved
