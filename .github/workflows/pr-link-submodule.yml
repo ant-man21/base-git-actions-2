@@ -10,25 +10,21 @@ on:
       - develop  # Add your target branches here
 
 jobs:
-  link-and-validate:
+  # Job 1: Checkout once and discover all submodules
+  discover-submodules:
     runs-on: ubuntu-latest
-    if: startsWith(github.head_ref, 'users/')
-    
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      checks: write
-      statuses: write
-    
+    outputs:
+      matrix: ${{ steps.submodule.outputs.matrix }}
+      has-submodules: ${{ steps.submodule.outputs.has-submodules }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          # Only checkout the main repo, not submodules yet
+          submodules: true #maybe false idk
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Extract ticket number
         id: extract
         run: |
@@ -36,27 +32,92 @@ jobs:
           TICKET_NUM=$(echo "$BRANCH_NAME" | sed 's/users\///')
           echo "ticket_num=$TICKET_NUM" >> $GITHUB_OUTPUT
           echo "Branch: $BRANCH_NAME, Ticket: $TICKET_NUM"
-      
-      - name: Get submodule info
+
+      - name: Get all submodule info
         id: submodule
         run: |
-          # Get submodule path and URL
-          SUBMODULE_PATH=$(git config --file .gitmodules --get-regexp path | awk '{ print $2 }' | head -1)
-          SUBMODULE_URL=$(git config --file .gitmodules --get-regexp url | awk '{ print $2 }' | head -1)
-          
-          # Extract owner and repo from URL
-          if [[ $SUBMODULE_URL == git@github.com:* ]]; then
-            SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/git@github.com://' | sed 's/.git$//')
-          elif [[ $SUBMODULE_URL == https://github.com/* ]]; then
-            SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/https:\/\/github.com\///' | sed 's/.git$//')
-          else
-            echo "Unknown submodule URL format"
-            exit 1
+          # Check if .gitmodules exists
+          if [[ ! -f .gitmodules ]]; then
+            echo "No .gitmodules file found"
+            echo "has-submodules=false" >> $GITHUB_OUTPUT
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            exit 0
           fi
           
-          echo "submodule_path=$SUBMODULE_PATH" >> $GITHUB_OUTPUT
-          echo "submodule_repo=$SUBMODULE_REPO" >> $GITHUB_OUTPUT
-          echo "Submodule: $SUBMODULE_REPO at $SUBMODULE_PATH"
+          # Create matrix-compatible JSON
+          MATRIX_JSON="{\"include\":["
+          FIRST=true
+          COUNT=0
+          
+          # Process each submodule
+          git config --file .gitmodules --name-only | grep '\.path$' | while IFS= read -r path_key; do
+            submodule_name=$(echo "$path_key" | sed 's/\.path$//')
+            
+            SUBMODULE_PATH=$(git config --file .gitmodules --get "$submodule_name.path")
+            SUBMODULE_URL=$(git config --file .gitmodules --get "$submodule_name.url")
+            
+            # Extract repo info
+            if [[ $SUBMODULE_URL == git@github.com:* ]]; then
+              SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/git@github.com://' | sed 's/.git$//')
+            elif [[ $SUBMODULE_URL == https://github.com/* ]]; then
+              SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/https:\/\/github.com\///' | sed 's/.git$//')
+            else
+              echo "Skipping non-GitHub submodule: $SUBMODULE_URL"
+              continue
+            fi
+            
+            # Split owner and repo
+            IFS='/' read -r owner repo <<< "$SUBMODULE_REPO"
+            
+            # Add to matrix JSON
+            if [[ $FIRST == true ]]; then
+              FIRST=false
+            else
+              MATRIX_JSON="$MATRIX_JSON,"
+            fi
+            
+            MATRIX_JSON="$MATRIX_JSON{\"path\":\"$SUBMODULE_PATH\",\"repo\":\"$SUBMODULE_REPO\",\"owner\":\"$owner\",\"repo_name\":\"$repo\",\"name\":\"$submodule_name\"}"
+            COUNT=$((COUNT + 1))
+            
+            echo "Found submodule: $owner/$repo at $SUBMODULE_PATH"
+          done
+          
+          MATRIX_JSON="$MATRIX_JSON]}"
+          
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+          echo "has-submodules=true" >> $GITHUB_OUTPUT
+          echo "Found $COUNT submodules total"
+          echo "Matrix JSON: $MATRIX_JSON"
+  
+  # Job 2: Process each submodule in parallel (PR linking, etc.)      
+  link-and-validate:
+    needs: discover-submodules
+    if: needs.discover-submodules.outputs.has-submodules == 'true'
+    if: startsWith(github.head_ref, 'users/')
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      checks: write
+      statuses: write
+
+    strategy:
+      # Process up to 5 submodules in parallel (adjust as needed)
+      max-parallel: 5
+      matrix: ${{ fromJson(needs.discover-submodules.outputs.matrix) }}
+    
+    steps:
+      - name: Process submodule - ${{ matrix.owner }}/${{ matrix.repo_name }}
+        run: |
+          echo "Processing submodule: ${{ matrix.owner }}/${{ matrix.repo_name }}"
+          echo "Path: ${{ matrix.path }}"
+          echo "Full repo: ${{ matrix.repo }}"
+          
+      # This step doesn't need to checkout the main repo again!
+      # It only works with the submodule repository via API calls
+      
       
       - name: Check for submodule PR
         id: check_pr
@@ -64,9 +125,10 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const [owner, repo] = '${{ steps.submodule.outputs.submodule_repo }}'.split('/');
             const branchName = 'users/${{ steps.extract.outputs.ticket_num }}';
-            
+            const owner = '${{ matrix.owner }}';
+            const repo = '${{ matrix.repo_name }}';
+            const path = '${{ matrix.path }}';
             // Search for PR with matching branch
             const { data: prs } = await github.rest.pulls.list({
               owner: owner,
@@ -339,6 +401,8 @@ jobs:
                 body: comment
               });
             }
+
+  #Job 3: Check Submodule Pointers
   check-submodule-pointers:
     runs-on: ubuntu-latest
     name: Validate Submodule Pointers
@@ -453,3 +517,24 @@ jobs:
         else
           echo "❌ Submodule pointer check: FAILED"
         fi
+
+  # Job 4: Collect results (optional)
+  collect-results:
+    needs: [discover-submodules, process-submodules]
+    if: always() && needs.discover-submodules.outputs.has-submodules == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect processing results
+        run: |
+          echo "Finished processing all submodules"
+          echo "Submodule processing status: ${{ needs.process-submodules.result }}"
+          
+          # You can add logic here to:
+          # - Aggregate results from all parallel jobs
+          # - Create summary comments
+          # - Handle any failures
+          
+          if [[ "${{ needs.process-submodules.result }}" == "failure" ]]; then
+            echo "Some submodule processing failed"
+            exit 1
+          fi
