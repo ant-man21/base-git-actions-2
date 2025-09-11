@@ -12,6 +12,7 @@ on:
 jobs:
   # Job 1: Checkout once and discover all submodules
   discover-submodules:
+    name: Discover Submodules
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.submodule.outputs.matrix }}
@@ -101,6 +102,7 @@ jobs:
 
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
   link-and-validate:
+    name: Link and Validate
     needs: discover-submodules
     if: needs.discover-submodules.outputs.has-submodules == 'true' && startsWith(github.head_ref, 'users/')
 
@@ -312,24 +314,6 @@ jobs:
                 }
               }
             }
-            
-            const checkRun = {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'Submodule PR Status',
-              head_sha: context.payload.pull_request.head.sha,
-              status: status,
-              output: {
-                title: title,
-                summary: summary
-              }
-            };
-            
-            if (conclusion) {
-              checkRun.conclusion = conclusion;
-            }
-            
-            await github.rest.checks.create(checkRun);
       
       - name: Add PR label
         uses: actions/github-script@v7
@@ -401,6 +385,23 @@ jobs:
                 body: comment
               });
             }
+      - name: Status Report
+        if: steps.check_pr.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const isFound = '${{ steps.check_pr.outputs.found }}' === 'true';
+            const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
+            if (isFound === "true" && isApproved === "true") {
+              console.log("✅ Success");
+              // Exit 0 means success
+              process.exit(0);
+            } else {
+              console.error("❌ Failed");
+              // Exit 1 means failure
+              process.exit(1);
+            } 
 
   #Job 3: Check Submodule Pointers
   check-submodule-pointers:
@@ -538,3 +539,30 @@ jobs:
             echo "Some submodule processing failed"
             exit 1
           fi
+      
+      - name: Submodules PR Status
+        script: |
+            const found = '${{ needs.link-and-validate.result }}' === 'true';
+            console.log("found =");
+            console.log(found);
+            const title = "title";
+            const status = 'completed';
+            const conclusion = 'failure';
+
+            const checkRun = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'Submodule PR Status',
+              head_sha: context.payload.pull_request.head.sha,
+              status: status,
+              output: {
+                title: title,
+                summary: summary
+              }
+            };
+            
+            if (conclusion) {
+              checkRun.conclusion = conclusion;
+            }
+            
+            await github.rest.checks.create(checkRun);
