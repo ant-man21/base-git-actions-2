@@ -369,7 +369,7 @@ jobs:
             const submoduleRepo = '${{ matrix.repo_name }}';
             const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
             console.log(`Submodule PR Status: ${isApproved}`);
-            const comment = `## 🔗 ${submoduleRepo} Linked Submodule PR: ${submodulePrUrl}`;
+            const comment = `🔗 Linked Submodule PR: [\`${submoduleRepo}\`](${submodulePrUrl})`;
             
             // Check if we already commented
             const { data: comments } = await github.rest.issues.listComments({
@@ -381,7 +381,7 @@ jobs:
             
             const botComment = comments.find(comment => 
               comment.user.type === 'Bot' && 
-              comment.body.includes(`${submoduleRepo} Linked Submodule PR: ${submodulePrUrl}`)
+              comment.body.includes(comment)
             );
             
             if (botComment) {
