@@ -37,8 +37,8 @@ jobs:
 
           echo "Comparing against base: $BASE_SHA"
 
-          # Collect changed submodules by looking at git diff for submodule paths
-          CHANGED_SUBMODULES=$(git diff --cached --name-only $BASE_SHA HEAD | grep -E '^[^/]+$' || true)
+          # Collect changed submodules (pointer SHA changes only)
+          CHANGED_SUBMODULES=$(git diff --name-only $BASE_SHA HEAD | grep -E '^[^/]+$' || true)
 
           if [[ -z "$CHANGED_SUBMODULES" ]]; then
             echo "No submodule changes detected"
