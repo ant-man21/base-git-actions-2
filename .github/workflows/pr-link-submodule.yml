@@ -92,8 +92,8 @@ jobs:
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
   link-and-validate:
     needs: discover-submodules
-    if: needs.discover-submodules.outputs.has-submodules == 'true'
-    if: startsWith(github.head_ref, 'users/')
+    if: needs.discover-submodules.outputs.has-submodules == 'true' && startsWith(github.head_ref, 'users/')
+
     runs-on: ubuntu-latest
     
     permissions:
