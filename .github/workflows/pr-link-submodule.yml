@@ -366,7 +366,7 @@ jobs:
           script: |
             const prNumber = context.issue.number;
             const submodulePrUrl = '${{ steps.check_pr.outputs.pr_url }}';
-            const submoduleRepo = '${{ steps.submodule.outputs.submodule_repo }}';
+            const submoduleRepo = '${{ matrix.repo_name }}';
             const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
             console.log(`Submodule PR Status: ${isApproved}`);
             var comment = "";
