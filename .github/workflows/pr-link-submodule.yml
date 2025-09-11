@@ -107,7 +107,7 @@ jobs:
     if: needs.discover-submodules.outputs.has-submodules == 'true' && startsWith(github.head_ref, 'users/')
 
     runs-on: ubuntu-latest
-    
+    continue-on-error: true
     permissions:
       contents: write
       pull-requests: write
@@ -354,7 +354,13 @@ jobs:
             const submoduleRepo = '${{ matrix.repo_name }}';
             const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
             console.log(`Submodule PR Status: ${isApproved}`);
-            const comment = `🔗 Linked Submodule PR: [\`${submoduleRepo}\`](${submodulePrUrl})\nStatus = ⏳`;
+            let approval_comment;
+            if (isApproved) {
+              approval_comment = ✅ submodule PR approved!;
+            } else {
+              approval_comment = ⏳ Waiting for submodule PR to be approved;
+            }
+            const comment = `🔗 Linked Submodule PR: [\`${submoduleRepo}\`](${submodulePrUrl})\nStatus = ${approval_comment}`;
             
             // Check if we already commented
             const { data: comments } = await github.rest.issues.listComments({
