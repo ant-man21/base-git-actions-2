@@ -44,17 +44,26 @@ jobs:
             exit 0
           fi
           
-          # Create matrix-compatible JSON
+          # Debug: Show .gitmodules content
+          echo "=== .gitmodules content ==="
+          cat .gitmodules
+          echo "=========================="
+          
+          # Create matrix-compatible JSON using process substitution to avoid subshell
           MATRIX_JSON="{\"include\":["
           FIRST=true
           COUNT=0
           
-          # Process each submodule
-          git config --file .gitmodules --name-only | grep '\.path$' | while IFS= read -r path_key; do
+          # Use process substitution instead of pipe to avoid subshell
+          while IFS= read -r path_key; do
             submodule_name=$(echo "$path_key" | sed 's/\.path$//')
             
             SUBMODULE_PATH=$(git config --file .gitmodules --get "$submodule_name.path")
             SUBMODULE_URL=$(git config --file .gitmodules --get "$submodule_name.url")
+            
+            echo "Processing: $submodule_name"
+            echo "  Path: $SUBMODULE_PATH"
+            echo "  URL: $SUBMODULE_URL"
             
             # Extract repo info
             if [[ $SUBMODULE_URL == git@github.com:* ]]; then
@@ -80,15 +89,21 @@ jobs:
             COUNT=$((COUNT + 1))
             
             echo "Found submodule: $owner/$repo at $SUBMODULE_PATH"
-          done
+          done < <(git config --file .gitmodules --name-only | grep '\.path$')
           
           MATRIX_JSON="$MATRIX_JSON]}"
           
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
-          echo "has-submodules=true" >> $GITHUB_OUTPUT
+          
+          if [[ $COUNT -gt 0 ]]; then
+            echo "has-submodules=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-submodules=false" >> $GITHUB_OUTPUT
+          fi
+          
           echo "Found $COUNT submodules total"
           echo "Matrix JSON: $MATRIX_JSON"
-  
+        
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
   link-and-validate:
     needs: discover-submodules
