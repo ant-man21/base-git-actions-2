@@ -25,14 +25,6 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract ticket number
-        id: extract
-        run: |
-          BRANCH_NAME="${{ github.head_ref }}"
-          TICKET_NUM=$(echo "$BRANCH_NAME" | sed 's/users\///')
-          echo "ticket_num=$TICKET_NUM" >> $GITHUB_OUTPUT
-          echo "Branch: $BRANCH_NAME, Ticket: $TICKET_NUM"
-
       - name: Get all submodule info
         id: submodule
         run: |
@@ -142,7 +134,14 @@ jobs:
           
       # This step doesn't need to checkout the main repo again!
       # It only works with the submodule repository via API calls
-      
+
+      - name: Extract ticket number
+        id: extract
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          TICKET_NUM=$(echo "$BRANCH_NAME" | sed 's/users\///')
+          echo "ticket_num=$TICKET_NUM" >> $GITHUB_OUTPUT
+          echo "Branch: $BRANCH_NAME, Ticket: $TICKET_NUM"
       
       - name: Check for submodule PR
         id: check_pr
