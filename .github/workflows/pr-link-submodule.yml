@@ -54,42 +54,52 @@ jobs:
           FIRST=true
           COUNT=0
           
-          # Use process substitution instead of pipe to avoid subshell
-          while IFS= read -r path_key; do
-            submodule_name=$(echo "$path_key" | sed 's/\.path$//')
-            
-            SUBMODULE_PATH=$(git config --file .gitmodules --get "$submodule_name.path")
-            SUBMODULE_URL=$(git config --file .gitmodules --get "$submodule_name.url")
-            
-            echo "Processing: $submodule_name"
-            echo "  Path: $SUBMODULE_PATH"
-            echo "  URL: $SUBMODULE_URL"
-            
-            # Extract repo info
-            if [[ $SUBMODULE_URL == git@github.com:* ]]; then
-              SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/git@github.com://' | sed 's/.git$//')
-            elif [[ $SUBMODULE_URL == https://github.com/* ]]; then
-              SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/https:\/\/github.com\///' | sed 's/.git$//')
-            else
-              echo "Skipping non-GitHub submodule: $SUBMODULE_URL"
-              continue
+          # Use git config --get-regexp to find all submodule paths
+          while IFS= read -r line; do
+            # Line format: "submodule.NAME.path VALUE"
+            if [[ $line =~ ^submodule\.([^.]+)\.path[[:space:]]+(.+)$ ]]; then
+              submodule_name="${BASH_REMATCH[1]}"
+              SUBMODULE_PATH="${BASH_REMATCH[2]}"
+              
+              # Get the URL for this submodule
+              SUBMODULE_URL=$(git config --file .gitmodules --get "submodule.$submodule_name.url")
+              
+              echo "Processing: $submodule_name"
+              echo "  Path: $SUBMODULE_PATH"
+              echo "  URL: $SUBMODULE_URL"
+              
+              # Skip if we couldn't get the URL
+              if [[ -z "$SUBMODULE_URL" ]]; then
+                echo "  Skipping due to missing URL"
+                continue
+              fi
+              
+              # Extract repo info
+              if [[ $SUBMODULE_URL == git@github.com:* ]]; then
+                SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/git@github.com://' | sed 's/.git$//')
+              elif [[ $SUBMODULE_URL == https://github.com/* ]]; then
+                SUBMODULE_REPO=$(echo $SUBMODULE_URL | sed 's/https:\/\/github.com\///' | sed 's/.git$//')
+              else
+                echo "  Skipping non-GitHub submodule: $SUBMODULE_URL"
+                continue
+              fi
+              
+              # Split owner and repo
+              IFS='/' read -r owner repo <<< "$SUBMODULE_REPO"
+              
+              # Add to matrix JSON
+              if [[ $FIRST == true ]]; then
+                FIRST=false
+              else
+                MATRIX_JSON="$MATRIX_JSON,"
+              fi
+              
+              MATRIX_JSON="$MATRIX_JSON{\"path\":\"$SUBMODULE_PATH\",\"repo\":\"$SUBMODULE_REPO\",\"owner\":\"$owner\",\"repo_name\":\"$repo\",\"name\":\"$submodule_name\"}"
+              COUNT=$((COUNT + 1))
+              
+              echo "  Found submodule: $owner/$repo at $SUBMODULE_PATH"
             fi
-            
-            # Split owner and repo
-            IFS='/' read -r owner repo <<< "$SUBMODULE_REPO"
-            
-            # Add to matrix JSON
-            if [[ $FIRST == true ]]; then
-              FIRST=false
-            else
-              MATRIX_JSON="$MATRIX_JSON,"
-            fi
-            
-            MATRIX_JSON="$MATRIX_JSON{\"path\":\"$SUBMODULE_PATH\",\"repo\":\"$SUBMODULE_REPO\",\"owner\":\"$owner\",\"repo_name\":\"$repo\",\"name\":\"$submodule_name\"}"
-            COUNT=$((COUNT + 1))
-            
-            echo "Found submodule: $owner/$repo at $SUBMODULE_PATH"
-          done < <(git config --file .gitmodules --name-only | grep '\.path$')
+          done < <(git config --file .gitmodules --get-regexp 'submodule\..*\.path')
           
           MATRIX_JSON="$MATRIX_JSON]}"
           
@@ -103,7 +113,7 @@ jobs:
           
           echo "Found $COUNT submodules total"
           echo "Matrix JSON: $MATRIX_JSON"
-        
+
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
   link-and-validate:
     needs: discover-submodules
