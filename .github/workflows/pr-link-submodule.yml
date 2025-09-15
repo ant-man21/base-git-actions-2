@@ -1,6 +1,6 @@
 # .github/workflows/pr-link-submodule.yml
-name: Link and Validate Submodule PR
-
+name: Link PR
+# Link and Validate Submodule PR
 on:
   pull_request:
     types: [opened, synchronize]
@@ -99,10 +99,9 @@ jobs:
           echo "Found $COUNT changed submodules"
           echo "Matrix JSON: $MATRIX_JSON"
 
-
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
   link-and-validate:
-    name: Link and Validate
+    name: "PR Status: ${{ matrix.submodule }}"
     needs: discover-submodules
     if: needs.discover-submodules.outputs.has-submodules == 'true' && startsWith(github.head_ref, 'users/')
 
@@ -531,40 +530,40 @@ jobs:
           echo "❌ Submodule pointer check: FAILED"
         fi
 
-  # Job 4: Collect results (optional)
-  collect-results:
-    needs: [discover-submodules, link-and-validate]
-    if: always() && needs.discover-submodules.outputs.has-submodules == 'true'
-    runs-on: ubuntu-latest
-    steps:
+  # # Job 4: Collect results (optional)
+  # collect-results:
+  #   needs: [discover-submodules, link-and-validate]
+  #   if: always() && needs.discover-submodules.outputs.has-submodules == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
       
-      - name: Submodules PR Status
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const results = '${{ needs.link-and-validate.result }}' === 'true';
-            console.log("needs.link-and-validate.result =");
-            console.log(results);
-            const title = "title";
-            const summary = "summary";
-            const status = 'completed';
-            const conclusion = 'failure';
+  #     - name: Submodules PR Status
+  #       uses: actions/github-script@v7
+  #       with:
+  #         github-token: ${{ secrets.GITHUB_TOKEN }}
+  #         script: |
+  #           const results = '${{ needs.link-and-validate.result }}' === 'true';
+  #           console.log("needs.link-and-validate.result =");
+  #           console.log(results);
+  #           const title = "title";
+  #           const summary = "summary";
+  #           const status = 'completed';
+  #           const conclusion = 'failure';
 
-            const checkRun = {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'Submodule PR Status',
-              head_sha: context.payload.pull_request.head.sha,
-              status: status,
-              output: {
-                title: title,
-                summary: summary
-              }
-            };
+  #           const checkRun = {
+  #             owner: context.repo.owner,
+  #             repo: context.repo.repo,
+  #             name: 'Submodule PR Status',
+  #             head_sha: context.payload.pull_request.head.sha,
+  #             status: status,
+  #             output: {
+  #               title: title,
+  #               summary: summary
+  #             }
+  #           };
             
-            if (conclusion) {
-              checkRun.conclusion = conclusion;
-            }
+  #           if (conclusion) {
+  #             checkRun.conclusion = conclusion;
+  #           }
             
-            await github.rest.checks.create(checkRun);
+  #           await github.rest.checks.create(checkRun);
