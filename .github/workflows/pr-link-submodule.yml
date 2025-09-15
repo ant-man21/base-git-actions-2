@@ -1,5 +1,5 @@
 # .github/workflows/pr-link-submodule.yml
-name: Link and Validate Submodule PR
+name: Link PR
 
 on:
   pull_request:
@@ -29,6 +29,7 @@ jobs:
       - name: Get changed submodules
         id: submodule
         run: |
+          set -x  
           # Figure out the base ref (for PRs, use the PR base; otherwise fallback to main)
           if [[ -n "${{ github.event.pull_request.base.sha }}" ]]; then
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
@@ -38,8 +39,26 @@ jobs:
 
           echo "Comparing against base: $BASE_SHA"
 
-          # Collect changed submodules (pointer SHA changes only)
-          CHANGED_SUBMODULES=$(git diff --name-only $BASE_SHA HEAD | grep -E '^[^/]+$' || true)
+          # Get list of actual submodules from .gitmodules
+          ACTUAL_SUBMODULES=$(git config --file .gitmodules --get-regexp "submodule\..*\.path" | awk '{print $2}' || true)
+          
+          if [[ -z "$ACTUAL_SUBMODULES" ]]; then
+            echo "No submodules found in .gitmodules"
+            echo "has-submodules=false" >> $GITHUB_OUTPUT
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Get all changed files
+          ALL_CHANGED_FILES=$(git diff --name-only $BASE_SHA HEAD || true)
+          
+          # Filter to only include actual submodules that have changes
+          CHANGED_SUBMODULES=""
+          for submodule_path in $ACTUAL_SUBMODULES; do
+            if echo "$ALL_CHANGED_FILES" | grep -q "^$submodule_path$"; then
+              CHANGED_SUBMODULES="$CHANGED_SUBMODULES $submodule_path"
+            fi
+          done
 
           if [[ -z "$CHANGED_SUBMODULES" ]]; then
             echo "No submodule changes detected"
@@ -102,7 +121,7 @@ jobs:
 
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
   link-and-validate:
-    name: Link and Validate
+    name: "PR Status: ${{ matrix.repo_name }}"
     needs: discover-submodules
     if: needs.discover-submodules.outputs.has-submodules == 'true' && startsWith(github.head_ref, 'users/')
 
@@ -230,12 +249,16 @@ jobs:
                 conclusion = 'failure';
                 title = 'Submodule PR Not Found';
                 summary = `Submodule was updated but no open PR found in submodule repository for branch users/${{ steps.extract.outputs.ticket_num }}`;
+                console.error("❌ Failed");
+                process.exit(1);
               } else {
                 // No submodule updated, skip this check entirely
                 status = 'completed';
                 conclusion = 'success';
                 title = 'Submodule Check Skipped';
-                summary = `No submodules were updated in this PR, skipping submodule PR check. Submodule updated: ${submodule_updated}`;
+                //summary = `No submodules were updated in this PR, skipping submodule PR check. Submodule updated: ${submodule_updated}`;
+                //console.error("✅ Skipping submodule");
+                process.exit(0);
               }
             } else {
               // PR found - now check if it's open and approved
@@ -526,41 +549,3 @@ jobs:
         else
           echo "❌ Submodule pointer check: FAILED"
         fi
-
-  # Job 4: Collect results (optional)
-  collect-results:
-    needs: [discover-submodules, link-and-validate]
-    if: always() && needs.discover-submodules.outputs.has-submodules == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      
-      - name: Submodules PR Status
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const results = '${{ needs.link-and-validate.result }}' === 'true';
-            console.log("needs.link-and-validate.result =");
-            console.log(results);
-            const title = "title";
-            const summary = "summary";
-            const status = 'completed';
-            const conclusion = 'failure';
-
-            const checkRun = {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'Submodule PR Status',
-              head_sha: context.payload.pull_request.head.sha,
-              status: status,
-              output: {
-                title: title,
-                summary: summary
-              }
-            };
-            
-            if (conclusion) {
-              checkRun.conclusion = conclusion;
-            }
-            
-            await github.rest.checks.create(checkRun);
