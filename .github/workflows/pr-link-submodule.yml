@@ -126,7 +126,6 @@ jobs:
     if: needs.discover-submodules.outputs.has-submodules == 'true' && startsWith(github.head_ref, 'users/')
 
     runs-on: ubuntu-latest
-    continue-on-error: true
     permissions:
       contents: write
       pull-requests: write
