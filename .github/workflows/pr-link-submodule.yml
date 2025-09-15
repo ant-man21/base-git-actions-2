@@ -99,9 +99,10 @@ jobs:
           echo "Found $COUNT changed submodules"
           echo "Matrix JSON: $MATRIX_JSON"
 
+
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
   link-and-validate:
-    name: "PR Status: ${{ matrix.submodule }}"
+    name: Link and Validate
     needs: discover-submodules
     if: needs.discover-submodules.outputs.has-submodules == 'true' && startsWith(github.head_ref, 'users/')
 
