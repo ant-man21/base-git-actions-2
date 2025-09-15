@@ -29,6 +29,7 @@ jobs:
       - name: Get changed submodules
         id: submodule
         run: |
+          set -x  
           # Figure out the base ref (for PRs, use the PR base; otherwise fallback to main)
           if [[ -n "${{ github.event.pull_request.base.sha }}" ]]; then
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
