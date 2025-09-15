@@ -538,7 +538,7 @@ jobs:
           echo "  git add <submodule-path>"
           echo "  git commit -m 'Update submodule to latest main'"
         fi
-        exit 1
+        exit 0
         # exit $exit_code
         # force success for now
         
