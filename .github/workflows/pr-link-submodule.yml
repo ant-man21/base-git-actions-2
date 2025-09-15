@@ -39,8 +39,26 @@ jobs:
 
           echo "Comparing against base: $BASE_SHA"
 
-          # Collect changed submodules (pointer SHA changes only)
-          CHANGED_SUBMODULES=$(git diff --name-only $BASE_SHA HEAD | grep -E '^[^/]+$' || true)
+          # Get list of actual submodules from .gitmodules
+          ACTUAL_SUBMODULES=$(git config --file .gitmodules --get-regexp "submodule\..*\.path" | awk '{print $2}' || true)
+          
+          if [[ -z "$ACTUAL_SUBMODULES" ]]; then
+            echo "No submodules found in .gitmodules"
+            echo "has-submodules=false" >> $GITHUB_OUTPUT
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Get all changed files
+          ALL_CHANGED_FILES=$(git diff --name-only $BASE_SHA HEAD || true)
+          
+          # Filter to only include actual submodules that have changes
+          CHANGED_SUBMODULES=""
+          for submodule_path in $ACTUAL_SUBMODULES; do
+            if echo "$ALL_CHANGED_FILES" | grep -q "^$submodule_path$"; then
+              CHANGED_SUBMODULES="$CHANGED_SUBMODULES $submodule_path"
+            fi
+          done
 
           if [[ -z "$CHANGED_SUBMODULES" ]]; then
             echo "No submodule changes detected"
