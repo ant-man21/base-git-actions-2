@@ -459,24 +459,15 @@ jobs:
       - name: Check results
         run: |
           if [[ "${{ needs.discover-submodules.outputs.has-submodules }}" == "false" ]]; then
-            echo "No submodules found - check passes ✅"
+            echo "## No submodules found - check passes ✅" >> $GITHUB_STEP_SUMMARY
             exit 0
           elif [[ "${{ needs.link-and-validate.result }}" == "success" ]]; then
-            echo "All submodule checks passed ✅"  
+            echo "## All submodule checks passed ✅" >> $GITHUB_STEP_SUMMARY
             exit 0
           else
-            echo "Submodule checks failed ❌"
+            echo "## Submodule checks failed ❌" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
-      - name: Generate Summary
-        run: |
-          echo "## 🚀 Build Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Status | Details |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Tests | ✅ Passed | 45/45 tests passing |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build | ✅ Success | Built in 2m 34s |" >> $GITHUB_STEP_SUMMARY
-          echo "| Linting | ⚠️ Warning | 3 minor issues found |" >> $GITHUB_STEP_SUMMARY
 
   #Job 3: Check Submodule Pointers
   check-submodule-pointers:
