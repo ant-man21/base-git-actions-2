@@ -458,6 +458,7 @@ jobs:
             echo "## Submodule checks failed ❌" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
+          echo "hello?"
 
   #Job 3: Check Submodule Pointers
   check-submodule-pointers:
