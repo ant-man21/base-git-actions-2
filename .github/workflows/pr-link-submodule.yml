@@ -29,7 +29,7 @@ jobs:
       - name: Get changed submodules
         id: submodule
         run: |
-          set -x  
+          # set -x  
           # Figure out the base ref (for PRs, use the PR base; otherwise fallback to main)
           if [[ -n "${{ github.event.pull_request.base.sha }}" ]]; then
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
@@ -37,7 +37,7 @@ jobs:
             BASE_SHA="origin/main"
           fi
 
-          echo "Comparing against base: $BASE_SHA"
+          echo "Comparing against base: $BASE_SHA" >> $GITHUB_STEP_SUMMARY
 
           # Get list of actual submodules from .gitmodules
           ACTUAL_SUBMODULES=$(git config --file .gitmodules --get-regexp "submodule\..*\.path" | awk '{print $2}' || true)
@@ -72,7 +72,7 @@ jobs:
           COUNT=0
 
           for SUBMODULE_PATH in $CHANGED_SUBMODULES; do
-            echo "Processing changed submodule: $SUBMODULE_PATH"
+            echo "Processing changed submodule: $SUBMODULE_PATH" >> $GITHUB_STEP_SUMMARY
 
             # Extract name from .gitmodules
             submodule_name=$(git config --file .gitmodules --get-regexp "submodule\..*\.path" | \
@@ -115,18 +115,8 @@ jobs:
             echo "has-submodules=false" >> $GITHUB_OUTPUT
           fi
 
-          echo "Found $COUNT changed submodules"
+          echo "Found $COUNT changed submodules" >> $GITHUB_STEP_SUMMARY
           echo "Matrix JSON: $MATRIX_JSON"
-      - name: Generate Summary
-        run: |
-          echo "## 🚀 Build Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Status | Details |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Tests | ✅ Passed | 45/45 tests passing |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build | ✅ Success | Built in 2m 34s |" >> $GITHUB_STEP_SUMMARY
-          echo "| Linting | ⚠️ Warning | 3 minor issues found |" >> $GITHUB_STEP_SUMMARY
-
 
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
   link-and-validate:
@@ -539,9 +529,9 @@ jobs:
           
           # Check if the SHA exists on main branch
           if git merge-base --is-ancestor "$current_sha" origin/main 2>/dev/null; then
-            echo "- **Status:** ✅ SHA $current_sha is reachable from **main** branch" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status:** ✅ SHA is reachable from **main** branch" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- **Status:** ❌ SHA $current_sha is NOT reachable from **main** branch" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status:** ❌ SHA is NOT reachable from **main** branch" >> $GITHUB_STEP_SUMMARY
             echo "  This commit may be on a feature branch only" >> $GITHUB_STEP_SUMMARY
             echo "---" >> $GITHUB_STEP_SUMMARY
             
