@@ -36,9 +36,8 @@ jobs:
           else
             BASE_SHA="origin/main"
           fi
-
-          echo "Comparing against base: $BASE_SHA" >> $GITHUB_STEP_SUMMARY
-
+          echo "# 🔍 Discover Submodules" >> $GITHUB_STEP_SUMMARY
+          echo "## Comparing against base: $BASE_SHA" >> $GITHUB_STEP_SUMMARY
           # Get list of actual submodules from .gitmodules
           ACTUAL_SUBMODULES=$(git config --file .gitmodules --get-regexp "submodule\..*\.path" | awk '{print $2}' || true)
           
@@ -61,7 +60,7 @@ jobs:
           done
 
           if [[ -z "$CHANGED_SUBMODULES" ]]; then
-            echo "No submodule changes detected"
+            echo "## ✅ No submodule changes detected" >> $GITHUB_STEP_SUMMARY
             echo "has-submodules=false" >> $GITHUB_OUTPUT
             echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
             exit 0
@@ -72,7 +71,8 @@ jobs:
           COUNT=0
 
           for SUBMODULE_PATH in $CHANGED_SUBMODULES; do
-            echo "Processing changed submodule: $SUBMODULE_PATH" >> $GITHUB_STEP_SUMMARY
+            echo "---" >> $GITHUB_STEP_SUMMARY
+            echo "## 📂 Processing changed submodule: $SUBMODULE_PATH" >> $GITHUB_STEP_SUMMARY
 
             # Extract name from .gitmodules
             submodule_name=$(git config --file .gitmodules --get-regexp "submodule\..*\.path" | \
@@ -114,8 +114,8 @@ jobs:
           else
             echo "has-submodules=false" >> $GITHUB_OUTPUT
           fi
-
-          echo "Found $COUNT changed submodules" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "## Found $COUNT changed submodules" >> $GITHUB_STEP_SUMMARY
           echo "Matrix JSON: $MATRIX_JSON"
 
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
@@ -495,7 +495,7 @@ jobs:
         
         exit_code=0
         echo "# 🔍 Submodule Pointer Validation" >> $GITHUB_STEP_SUMMARY
-        echo "## ✅ Submodule Checks" >> $GITHUB_STEP_SUMMARY
+        echo "## Submodule Checks" >> $GITHUB_STEP_SUMMARY
         for submodule_path in $submodules; do
           echo "### 📂 $submodule_path" >> $GITHUB_STEP_SUMMARY
           
@@ -530,9 +530,9 @@ jobs:
           # Check if the SHA exists on main branch
           if git merge-base --is-ancestor "$current_sha" origin/main 2>/dev/null; then
             echo "- **Status:** ✅ SHA is reachable from **main** branch" >> $GITHUB_STEP_SUMMARY
+            echo "---" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- **Status:** ❌ SHA is NOT reachable from **main** branch" >> $GITHUB_STEP_SUMMARY
-            echo "  This commit may be on a feature branch only" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status:** ❌ SHA is NOT reachable from **main** branch. This commit may be on a feature branch only." >> $GITHUB_STEP_SUMMARY
             echo "---" >> $GITHUB_STEP_SUMMARY
             
             # Show which branches contain this commit for debugging
