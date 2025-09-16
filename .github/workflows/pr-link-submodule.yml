@@ -2,7 +2,7 @@
 name: Link PR
 
 on:
-  pull_request:
+  pull_request_target: #pull_request <why does this not work
     types: [opened, synchronize]
     branches:
       - main
@@ -458,7 +458,6 @@ jobs:
             echo "## Submodule checks failed ❌" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
-          echo "hello?"
 
   #Job 3: Check Submodule Pointers
   check-submodule-pointers:
