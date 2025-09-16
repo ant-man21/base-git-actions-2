@@ -513,9 +513,10 @@ jobs:
         fi
         
         exit_code=0
-        
+        echo "# 🔍 Submodule Pointer Validation" >> $GITHUB_STEP_SUMMARY
+        echo "## ✅ Submodule Checks" >> $GITHUB_STEP_SUMMARY
         for submodule_path in $submodules; do
-          echo "Checking submodule: $submodule_path" >> $GITHUB_STEP_SUMMARY
+          echo "### 📂 $submodule_path" >> $GITHUB_STEP_SUMMARY
           
           # Get the submodule URL and current commit SHA
           submodule_url=$(git config --file .gitmodules --get submodule.$submodule_path.url)
@@ -527,8 +528,8 @@ jobs:
             continue
           fi
           
-          echo "  Current SHA: $current_sha" >> $GITHUB_STEP_SUMMARY
-          echo "  URL: $submodule_url" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current SHA:** `$current_sha"` >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** $submodule_url" >> $GITHUB_STEP_SUMMARY
           
           # Clone the submodule repository to a temp directory
           temp_dir=$(mktemp -d)
@@ -547,13 +548,14 @@ jobs:
           
           # Check if the SHA exists on main branch
           if git merge-base --is-ancestor "$current_sha" origin/main 2>/dev/null; then
-            echo "✅ SHA $current_sha is reachable from main branch" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status:** ✅ SHA $current_sha is reachable from **main** branch" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ SHA $current_sha is NOT reachable from main branch" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status:** ❌ SHA $current_sha is NOT reachable from **main** branch" >> $GITHUB_STEP_SUMMARY
             echo "  This commit may be on a feature branch only" >> $GITHUB_STEP_SUMMARY
+            echo "---" >> $GITHUB_STEP_SUMMARY
             
             # Show which branches contain this commit for debugging
-            branches_with_commit=$(git branch -r --contains "$current_sha" 2>/dev/null | grep -v "HEAD" | sed 's/origin\///' | tr '\n' ' ' || echo "none")
+            # branches_with_commit=$(git branch -r --contains "$current_sha" 2>/dev/null | grep -v "HEAD" | sed 's/origin\///' | tr '\n' ' ' || echo "none")
             # echo "  Branches containing this commit: $branches_with_commit"
             
             exit_code=1
@@ -565,9 +567,13 @@ jobs:
           echo ""
         done
         
+        
+
         if [ $exit_code -eq 0 ]; then
-          echo "🎉 All submodule pointers are valid (pointing to commits on main branch)" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 Result" >> $GITHUB_STEP_SUMMARY
+          echo "**All submodule pointers are valid (pointing to commits on `main` branch)**" >> $GITHUB_STEP_SUMMARY
         else
+          echo "## ❌ Result" >> $GITHUB_STEP_SUMMARY
           echo "💥 One or more submodule pointers are invalid" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "To fix this issue:" >> $GITHUB_STEP_SUMMARY
@@ -590,7 +596,7 @@ jobs:
       if: always()
       run: |
         if [ ${{ steps.check-pointers.outcome }} == 'success' ]; then
-          echo "✅ Submodule pointer check: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Submodule pointer check: PASSED" >> $GITHUB_STEP_SUMMARY
         else
-          echo "❌ Submodule pointer check: FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Submodule pointer check: FAILED" >> $GITHUB_STEP_SUMMARY
         fi
