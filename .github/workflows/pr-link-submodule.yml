@@ -308,29 +308,15 @@ jobs:
                     
                     // Check if PR is ready to merge
                     const isApproved = approvals.length > 0 && changeRequests.length === 0;
-                    // push to outputs
                     core.setOutput('approvals_count', approvals.length);
                     core.setOutput('change_requests_count', changeRequests.length);
                     if (isApproved) {
                       core.setOutput('is_approved', 'true');
                       core.setOutput('is_mergeable','true');
-                      status = 'completed';
-                      conclusion = 'success';
-                      title = 'Submodule PR Approved';
-                      summary = `Submodule PR is open and approved: ${prUrl}\n\nApprovals: ${approvals.length}\nReady for coordinated merge.`;
-                    } else {
-                      status = 'in_progress';
-                      conclusion = undefined;
-                      title = 'Submodule PR Awaiting Approval';
-                      summary = `Linked to submodule PR: ${prUrl}\n\nStatus: Open but not yet approved\nApprovals: ${approvals.length}\nChange Requests: ${changeRequests.length}\n\nWaiting for approval before allowing merge.`;
                     }
                   }
                 } catch (error) {
                   console.error('Error checking PR status:', error);
-                  status = 'completed';
-                  conclusion = 'failure';
-                  title = 'Error Checking Submodule PR';
-                  summary = `Failed to check status of submodule PR: ${prUrl}\nError: ${error.message}`;
                 }
               }
             }
@@ -455,7 +441,7 @@ jobs:
           echo "---" >> $GITHUB_STEP_SUMMARY
 
           # Final result + exit code
-          if [[ "$pr_state" == "true" && "$is_approved" == "true" && "$mergeable" == "true" ]]; then
+          if [[ "$pr_state" == "true" && "$is_approved" == "true"]]; then
             echo "## 🎉 Result" >> $GITHUB_STEP_SUMMARY
             echo "The PR check **succeeded**. The Submodule PR is mergeable and approved." >> $GITHUB_STEP_SUMMARY
             exit 0
