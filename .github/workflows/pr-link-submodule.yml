@@ -37,7 +37,7 @@ jobs:
             BASE_SHA="origin/main"
           fi
           echo "# 🔍 Discover Submodules" >> $GITHUB_STEP_SUMMARY
-          echo "## Comparing against base: $BASE_SHA" >> $GITHUB_STEP_SUMMARY
+          echo "### Comparing against base: $BASE_SHA"
           # Get list of actual submodules from .gitmodules
           ACTUAL_SUBMODULES=$(git config --file .gitmodules --get-regexp "submodule\..*\.path" | awk '{print $2}' || true)
           
@@ -60,7 +60,7 @@ jobs:
           done
 
           if [[ -z "$CHANGED_SUBMODULES" ]]; then
-            echo "## ✅ No submodule changes detected" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ No submodule changes detected" >> $GITHUB_STEP_SUMMARY
             echo "has-submodules=false" >> $GITHUB_OUTPUT
             echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
             exit 0
@@ -72,7 +72,7 @@ jobs:
 
           for SUBMODULE_PATH in $CHANGED_SUBMODULES; do
             echo "---" >> $GITHUB_STEP_SUMMARY
-            echo "## 📂 Processing changed submodule: $SUBMODULE_PATH" >> $GITHUB_STEP_SUMMARY
+            echo "### 📂 Processing changed submodule: $SUBMODULE_PATH" >> $GITHUB_STEP_SUMMARY
 
             # Extract name from .gitmodules
             submodule_name=$(git config --file .gitmodules --get-regexp "submodule\..*\.path" | \
@@ -115,7 +115,7 @@ jobs:
             echo "has-submodules=false" >> $GITHUB_OUTPUT
           fi
           echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "## Found $COUNT changed submodules" >> $GITHUB_STEP_SUMMARY
+          echo "### Found $COUNT changed submodules" >> $GITHUB_STEP_SUMMARY
           echo "Matrix JSON: $MATRIX_JSON"
 
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
@@ -144,9 +144,6 @@ jobs:
           echo "Processing submodule: ${{ matrix.owner }}/${{ matrix.repo_name }}"
           echo "Path: ${{ matrix.path }}"
           echo "Full repo: ${{ matrix.repo }}"
-          
-      # This step doesn't need to checkout the main repo again!
-      # It only works with the submodule repository via API calls
 
       - name: Extract ticket number
         id: extract
@@ -313,7 +310,9 @@ jobs:
                     
                     // Check if PR is ready to merge
                     const isApproved = approvals.length > 0 && changeRequests.length === 0;
-                    
+                    // push to outputs
+                    core.setOutput('approvals_count', approvals.length);
+                    core.setOutput('change_requests_count', changeRequests.length);
                     if (isApproved) {
                       core.setOutput('is_approved', 'true');
                       status = 'completed';
@@ -413,6 +412,27 @@ jobs:
                 body: comment
               });
             }
+      - name: Generate Summary
+        run: |
+          echo "## 📋 PR Status Report"
+          echo "- **PR:** `${{ matrix.repo }}`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Path:** `${{ matrix.path }}`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ticket:** `${{ steps.extract.outputs.ticket_num }}`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Status"
+          echo "- **PR State:** `${{ steps.check_pr.outputs.found }}`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mergeable State:** `${{ steps.check_pr.outputs.mergeable }}`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Approvals:** `${{ steps.antman.outputs.approvals_count }}/2`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Change Requests:** `${{ strps.antman.outputs.change_requests_count }}`" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          #if mergable
+          if [[ ${{ steps.check_pr.outputs.mergeable }} == 'true' ]]; then
+            echo "## 🎉 Result" >> $GITHUB_STEP_SUMMARY
+            echo "The PR check **succeeded**. The Submodule PR is in a mergable state yet." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Result" >> $GITHUB_STEP_SUMMARY
+            echo "The PR check **failed**. The Submodule PR is not in a mergable state yet." >> $GITHUB_STEP_SUMMARY
+          fi
       - name: Status Report
         if: steps.check_pr.outputs.found == 'true'
         uses: actions/github-script@v7
@@ -430,15 +450,6 @@ jobs:
               console.error("❌ Failed");
               process.exit(1);
             }
-      - name: Generate Summary
-        run: |
-          echo "## 🚀 Build Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Status | Details |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Tests | ✅ Passed | 45/45 tests passing |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build | ✅ Success | Built in 2m 34s |" >> $GITHUB_STEP_SUMMARY
-          echo "| Linting | ⚠️ Warning | 3 minor issues found |" >> $GITHUB_STEP_SUMMARY
 
   workflow-status:
     name: "Link PR"
@@ -455,7 +466,7 @@ jobs:
             echo "## All submodule checks passed ✅" >> $GITHUB_STEP_SUMMARY
             exit 0
           else
-            echo "## Submodule checks failed ❌" >> $GITHUB_STEP_SUMMARY
+            echo "## Required submodules check failed ❌" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
@@ -567,15 +578,13 @@ jobs:
           echo "  git add <submodule-path>" >> $GITHUB_STEP_SUMMARY
           echo "  git commit -m 'Update submodule to latest main'" >> $GITHUB_STEP_SUMMARY
         fi
-        exit 0
-        # exit $exit_code
-        # force success for now
+        exit $exit_code
         
     - name: Report status
       if: always()
       run: |
         if [ ${{ steps.check-pointers.outcome }} == 'success' ]; then
-          echo "### ✅ Submodule pointer check: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Submodule pointer check: PASSED"
         else
-          echo "### ❌ Submodule pointer check: FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Submodule pointer check: FAILED"
         fi
