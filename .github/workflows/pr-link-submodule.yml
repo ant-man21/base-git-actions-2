@@ -412,27 +412,30 @@ jobs:
                 body: comment
               });
             }
-      - name: Generate Summary
+      - name: Summarize PR status
         run: |
-          echo "## 📋 PR Status Report"
-          echo "- **PR:** `${{ matrix.repo }}`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Path:** `${{ matrix.path }}`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Ticket:** `${{ steps.extract.outputs.ticket_num }}`" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 PR Status Report" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR:** '${{ matrix.repo }}'" >> $GITHUB_STEP_SUMMARY
+          echo "- **Path:** '${{ matrix.path }}'" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ticket:** '${{ steps.extract.outputs.ticket_num }}'" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔍 Status"
-          echo "- **PR State:** `${{ steps.check_pr.outputs.found }}`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Mergeable State:** `${{ steps.check_pr.outputs.mergeable }}`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Approvals:** `${{ steps.antman.outputs.approvals_count }}/2`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Change Requests:** `${{ steps.antman.outputs.change_requests_count }}`" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR State:** '${{ steps.check_pr.outputs.found }}'" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mergeable State:** '${{ steps.check_pr.outputs.mergeable }}'" >> $GITHUB_STEP_SUMMARY
+          echo "- **Approvals:** '${{ steps.antman.outputs.approvals_count }}/2'" >> $GITHUB_STEP_SUMMARY
+          echo "- **Change Requests:** '${{ steps.antman.outputs.change_requests_count }}'" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
-          #if mergable
-          if [[ ${{ steps.check_pr.outputs.mergeable }} == 'true' ]]; then
+
+          mergeable="${{ steps.check_pr.outputs.mergeable }}"
+
+          if [[ "$mergeable" == "true" ]]; then
             echo "## 🎉 Result" >> $GITHUB_STEP_SUMMARY
-            echo "The PR check **succeeded**. The Submodule PR is in a mergable state yet." >> $GITHUB_STEP_SUMMARY
+            echo "The PR check **succeeded**. The Submodule PR is in a mergeable state." >> $GITHUB_STEP_SUMMARY
           else
             echo "## ❌ Result" >> $GITHUB_STEP_SUMMARY
-            echo "The PR check **failed**. The Submodule PR is not in a mergable state yet." >> $GITHUB_STEP_SUMMARY
+            echo "The PR check **failed**. The Submodule PR is not in a mergeable state yet." >> $GITHUB_STEP_SUMMARY
           fi
+
       - name: Status Report
         if: steps.check_pr.outputs.found == 'true'
         uses: actions/github-script@v7
