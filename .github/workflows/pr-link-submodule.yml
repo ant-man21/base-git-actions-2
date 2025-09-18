@@ -194,6 +194,7 @@ jobs:
             const prUrl = '${{ steps.check_pr.outputs.pr_url }}';
             const submodulePrUrl = '${{ steps.check_pr.outputs.pr_url }}';
             core.setOutput('is_approved', 'false');
+            core.setOutput('is_mergeable','false')
             
             // Check if submodules were updated in this PR
             const { data: files } = await github.rest.pulls.listFiles({
@@ -276,10 +277,7 @@ jobs:
                     repo: submoduleRepo,
                     pull_number: parseInt(prNumber)
                   });
-                  
-                  console.log(`PR State: ${pr.state}`);
-                  console.log(`PR Mergeable State: ${pr.mergeable_state}`);
-                  
+                                    
                   // Check if PR is open
                   if (pr.state !== 'open') {
                     status = 'completed';
@@ -315,6 +313,7 @@ jobs:
                     core.setOutput('change_requests_count', changeRequests.length);
                     if (isApproved) {
                       core.setOutput('is_approved', 'true');
+                      core.setOutput('is_mergeable','true')
                       status = 'completed';
                       conclusion = 'success';
                       title = 'Submodule PR Approved';
@@ -412,47 +411,59 @@ jobs:
                 body: comment
               });
             }
-      - name: Summarize PR status
+      - name: Summarize & Validate PR Status
         run: |
-          echo "## 📋 PR Status Report" >> $GITHUB_STEP_SUMMARY
-          echo "- **PR:** '${{ matrix.repo }}'" >> $GITHUB_STEP_SUMMARY
-          echo "- **Path:** '${{ matrix.path }}'" >> $GITHUB_STEP_SUMMARY
-          echo "- **Ticket:** '${{ steps.extract.outputs.ticket_num }}'" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔍 Status" >> $GITHUB_STEP_SUMMARY
-          echo "- **PR State:** '${{ steps.check_pr.outputs.found }}'" >> $GITHUB_STEP_SUMMARY
-          echo "- **Mergeable State:** '${{ steps.check_pr.outputs.mergeable }}'" >> $GITHUB_STEP_SUMMARY
-          echo "- **Approvals:** '${{ steps.antman.outputs.approvals_count }}/2'" >> $GITHUB_STEP_SUMMARY
-          echo "- **Change Requests:** '${{ steps.antman.outputs.change_requests_count }}'" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
+          # Raw outputs
+          mergeable="${{ steps.check_pr.outputs.is_mergeable }}"
+          pr_state="${{ steps.check_pr.outputs.found }}"
+          is_approved="${{ steps.antman.outputs.is_approved }}"
+          approvals_count="${{ steps.antman.outputs.approvals_count }}"
+          change_requests_count="${{ steps.antman.outputs.change_requests_count }}"
 
-          mergeable="${{ steps.check_pr.outputs.mergeable }}"
-
+          # Map mergeable -> emoji + text
           if [[ "$mergeable" == "true" ]]; then
-            echo "## 🎉 Result" >> $GITHUB_STEP_SUMMARY
-            echo "The PR check **succeeded**. The Submodule PR is in a mergeable state." >> $GITHUB_STEP_SUMMARY
+            mergeable_display="🟢 Mergeable"
           else
-            echo "## ❌ Result" >> $GITHUB_STEP_SUMMARY
-            echo "The PR check **failed**. The Submodule PR is not in a mergeable state yet." >> $GITHUB_STEP_SUMMARY
+            mergeable_display="⛔ Blocked"
           fi
 
-      - name: Status Report
-        if: steps.check_pr.outputs.found == 'true'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const isFound = '${{ steps.check_pr.outputs.found }}' === 'true';
-            const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
-            console.log(isFound);
-            console.log(isApproved);
-            if (isFound === true && isApproved === true) {
-              console.log("✅ Success");
-              process.exit(0);
-            } else {
-              console.error("❌ Failed");
-              process.exit(1);
-            }
+          # Map PR state -> emoji + text
+          if [[ "$pr_state" == "true" ]]; then
+            pr_state_display="📂 Open"
+          else
+            pr_state_display="❓ Not Found"
+          fi
+
+          # Map approval -> emoji + text
+          if [[ "$is_approved" == "true" ]]; then
+            approval_display="✅ Approved"
+          else
+            approval_display="⚠️ Pending ($approvals_count/2)"
+          fi
+
+          # Write summary
+          echo "## 📋 PR Status Report" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR:** \`${{ matrix.repo }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Path:** \`${{ matrix.path }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ticket:** \`${{ steps.extract.outputs.ticket_num }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR State:** $pr_state_display" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mergeable State:** $mergeable_display" >> $GITHUB_STEP_SUMMARY
+          echo "- **Approvals:** $approval_display" >> $GITHUB_STEP_SUMMARY
+          echo "- **Change Requests:** \`$change_requests_count\`" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+
+          # Final result + exit code
+          if [[ "$pr_state" == "true" && "$is_approved" == "true" && "$mergeable" == "true" ]]; then
+            echo "## 🎉 Result" >> $GITHUB_STEP_SUMMARY
+            echo "The PR check **succeeded**. The Submodule PR is mergeable and approved." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          else
+            echo "## ❌ Result" >> $GITHUB_STEP_SUMMARY
+            echo "The PR check **failed**. One or more conditions are not satisfied." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
   workflow-status:
     name: "Link PR"
