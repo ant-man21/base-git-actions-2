@@ -2,7 +2,7 @@
 name: Link PR
 
 on:
-  pull_request: #pull_request_target <why does this not work
+  pull_request:
     types: [opened, synchronize]
     branches:
       - main
@@ -37,7 +37,7 @@ jobs:
             BASE_SHA="origin/main"
           fi
           echo "# 🔍 Discover Submodules" >> $GITHUB_STEP_SUMMARY
-          echo "## Comparing against base: $BASE_SHA" >> $GITHUB_STEP_SUMMARY
+          echo "### Comparing against base: $BASE_SHA"
           # Get list of actual submodules from .gitmodules
           ACTUAL_SUBMODULES=$(git config --file .gitmodules --get-regexp "submodule\..*\.path" | awk '{print $2}' || true)
           
@@ -60,7 +60,7 @@ jobs:
           done
 
           if [[ -z "$CHANGED_SUBMODULES" ]]; then
-            echo "## ✅ No submodule changes detected" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ No submodule changes detected" >> $GITHUB_STEP_SUMMARY
             echo "has-submodules=false" >> $GITHUB_OUTPUT
             echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
             exit 0
@@ -72,7 +72,7 @@ jobs:
 
           for SUBMODULE_PATH in $CHANGED_SUBMODULES; do
             echo "---" >> $GITHUB_STEP_SUMMARY
-            echo "## 📂 Processing changed submodule: $SUBMODULE_PATH" >> $GITHUB_STEP_SUMMARY
+            echo "### 📂 Processing changed submodule: $SUBMODULE_PATH" >> $GITHUB_STEP_SUMMARY
 
             # Extract name from .gitmodules
             submodule_name=$(git config --file .gitmodules --get-regexp "submodule\..*\.path" | \
@@ -115,7 +115,7 @@ jobs:
             echo "has-submodules=false" >> $GITHUB_OUTPUT
           fi
           echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "## Found $COUNT changed submodules" >> $GITHUB_STEP_SUMMARY
+          echo "### Found $COUNT changed submodules" >> $GITHUB_STEP_SUMMARY
           echo "Matrix JSON: $MATRIX_JSON"
 
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
@@ -144,9 +144,6 @@ jobs:
           echo "Processing submodule: ${{ matrix.owner }}/${{ matrix.repo_name }}"
           echo "Path: ${{ matrix.path }}"
           echo "Full repo: ${{ matrix.repo }}"
-          
-      # This step doesn't need to checkout the main repo again!
-      # It only works with the submodule repository via API calls
 
       - name: Extract ticket number
         id: extract
@@ -197,6 +194,7 @@ jobs:
             const prUrl = '${{ steps.check_pr.outputs.pr_url }}';
             const submodulePrUrl = '${{ steps.check_pr.outputs.pr_url }}';
             core.setOutput('is_approved', 'false');
+            core.setOutput('is_mergeable','false')
             
             // Check if submodules were updated in this PR
             const { data: files } = await github.rest.pulls.listFiles({
@@ -279,10 +277,7 @@ jobs:
                     repo: submoduleRepo,
                     pull_number: parseInt(prNumber)
                   });
-                  
-                  console.log(`PR State: ${pr.state}`);
-                  console.log(`PR Mergeable State: ${pr.mergeable_state}`);
-                  
+                                    
                   // Check if PR is open
                   if (pr.state !== 'open') {
                     status = 'completed';
@@ -313,26 +308,15 @@ jobs:
                     
                     // Check if PR is ready to merge
                     const isApproved = approvals.length > 0 && changeRequests.length === 0;
-                    
+                    core.setOutput('approvals_count', approvals.length);
+                    core.setOutput('change_requests_count', changeRequests.length);
                     if (isApproved) {
                       core.setOutput('is_approved', 'true');
-                      status = 'completed';
-                      conclusion = 'success';
-                      title = 'Submodule PR Approved';
-                      summary = `Submodule PR is open and approved: ${prUrl}\n\nApprovals: ${approvals.length}\nReady for coordinated merge.`;
-                    } else {
-                      status = 'in_progress';
-                      conclusion = undefined;
-                      title = 'Submodule PR Awaiting Approval';
-                      summary = `Linked to submodule PR: ${prUrl}\n\nStatus: Open but not yet approved\nApprovals: ${approvals.length}\nChange Requests: ${changeRequests.length}\n\nWaiting for approval before allowing merge.`;
+                      core.setOutput('is_mergeable','true');
                     }
                   }
                 } catch (error) {
                   console.error('Error checking PR status:', error);
-                  status = 'completed';
-                  conclusion = 'failure';
-                  title = 'Error Checking Submodule PR';
-                  summary = `Failed to check status of submodule PR: ${prUrl}\nError: ${error.message}`;
                 }
               }
             }
@@ -413,32 +397,60 @@ jobs:
                 body: comment
               });
             }
-      - name: Status Report
-        if: steps.check_pr.outputs.found == 'true'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const isFound = '${{ steps.check_pr.outputs.found }}' === 'true';
-            const isApproved = '${{ steps.antman.outputs.is_approved }}' === 'true';
-            console.log(isFound);
-            console.log(isApproved);
-            if (isFound === true && isApproved === true) {
-              console.log("✅ Success");
-              process.exit(0);
-            } else {
-              console.error("❌ Failed");
-              process.exit(1);
-            }
-      - name: Generate Summary
+      - name: Summarize & Validate PR Status
         run: |
-          echo "## 🚀 Build Results" >> $GITHUB_STEP_SUMMARY
+          # Raw outputs
+          mergeable="${{ steps.check_pr.outputs.is_mergeable }}"
+          pr_state="${{ steps.check_pr.outputs.found }}"
+          is_approved="${{ steps.antman.outputs.is_approved }}"
+          approvals_count="${{ steps.antman.outputs.approvals_count }}"
+          change_requests_count="${{ steps.antman.outputs.change_requests_count }}"
+
+          # Map mergeable -> emoji + text
+          if [[ "$mergeable" == "true" ]]; then
+            mergeable_display="🟢 Mergeable"
+          else
+            mergeable_display="⛔ Blocked"
+          fi
+
+          # Map PR state -> emoji + text
+          if [[ "$pr_state" == "true" ]]; then
+            pr_state_display="📂 Open"
+          else
+            pr_state_display="❓ Not Found"
+          fi
+
+          # Map approval -> emoji + text
+          if [[ "$is_approved" == "true" ]]; then
+            approval_display="✅ Approved"
+          else
+            approval_display="⚠️ Pending ($approvals_count/2)"
+          fi
+
+          # Write summary
+          echo "## 📋 PR Status Report" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR:** \`${{ matrix.repo }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Path:** \`${{ matrix.path }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ticket:** \`${{ steps.extract.outputs.ticket_num }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Status | Details |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Tests | ✅ Passed | 45/45 tests passing |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build | ✅ Success | Built in 2m 34s |" >> $GITHUB_STEP_SUMMARY
-          echo "| Linting | ⚠️ Warning | 3 minor issues found |" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR State:** $pr_state_display" >> $GITHUB_STEP_SUMMARY
+          # echo "- **Mergeable State:** $mergeable_display" >> $GITHUB_STEP_SUMMARY
+          echo "- **Approvals:** $approval_display" >> $GITHUB_STEP_SUMMARY
+          echo "- **Change Requests:** \`$change_requests_count\`" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+
+          echo "DEBUG: pr_state=$pr_state, is_approved=$is_approved, mergeable=$mergeable"
+          # Final result + exit code
+          if [[ "$pr_state" == "true" && "$is_approved" == "true" ]]; then
+            echo "## 🎉 Result" >> $GITHUB_STEP_SUMMARY
+            echo "The PR check **succeeded**. The Submodule PR is mergeable and approved." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          else
+            echo "## ❌ Result" >> $GITHUB_STEP_SUMMARY
+            echo "The PR check **failed**. One or more conditions are not satisfied." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
   workflow-status:
     name: "Link PR"
@@ -455,7 +467,7 @@ jobs:
             echo "## All submodule checks passed ✅" >> $GITHUB_STEP_SUMMARY
             exit 0
           else
-            echo "## Submodule checks failed ❌" >> $GITHUB_STEP_SUMMARY
+            echo "## Required submodules check failed ❌" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
@@ -567,15 +579,13 @@ jobs:
           echo "  git add <submodule-path>" >> $GITHUB_STEP_SUMMARY
           echo "  git commit -m 'Update submodule to latest main'" >> $GITHUB_STEP_SUMMARY
         fi
-        exit 0
-        # exit $exit_code
-        # force success for now
+        exit $exit_code
         
     - name: Report status
       if: always()
       run: |
         if [ ${{ steps.check-pointers.outcome }} == 'success' ]; then
-          echo "### ✅ Submodule pointer check: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Submodule pointer check: PASSED"
         else
-          echo "### ❌ Submodule pointer check: FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Submodule pointer check: FAILED"
         fi
