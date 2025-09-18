@@ -423,7 +423,7 @@ jobs:
           echo "- **PR State:** `${{ steps.check_pr.outputs.found }}`" >> $GITHUB_STEP_SUMMARY
           echo "- **Mergeable State:** `${{ steps.check_pr.outputs.mergeable }}`" >> $GITHUB_STEP_SUMMARY
           echo "- **Approvals:** `${{ steps.antman.outputs.approvals_count }}/2`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Change Requests:** `${{ strps.antman.outputs.change_requests_count }}`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Change Requests:** `${{ steps.antman.outputs.change_requests_count }}`" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           #if mergable
           if [[ ${{ steps.check_pr.outputs.mergeable }} == 'true' ]]; then
