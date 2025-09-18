@@ -440,8 +440,9 @@ jobs:
           echo "- **Change Requests:** \`$change_requests_count\`" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
 
+          echo "DEBUG: pr_state=$pr_state, is_approved=$is_approved, mergeable=$mergeable"
           # Final result + exit code
-          if [[ "$pr_state" == "true" && "$is_approved" == "true"]]; then
+          if [[ "$pr_state" == "true" && "$is_approved" == "true" ]]; then
             echo "## 🎉 Result" >> $GITHUB_STEP_SUMMARY
             echo "The PR check **succeeded**. The Submodule PR is mergeable and approved." >> $GITHUB_STEP_SUMMARY
             exit 0
