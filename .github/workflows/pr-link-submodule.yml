@@ -313,7 +313,7 @@ jobs:
                     core.setOutput('change_requests_count', changeRequests.length);
                     if (isApproved) {
                       core.setOutput('is_approved', 'true');
-                      core.setOutput('is_mergeable','true')
+                      core.setOutput('is_mergeable','true');
                       status = 'completed';
                       conclusion = 'success';
                       title = 'Submodule PR Approved';
