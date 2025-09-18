@@ -435,7 +435,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔍 Status" >> $GITHUB_STEP_SUMMARY
           echo "- **PR State:** $pr_state_display" >> $GITHUB_STEP_SUMMARY
-          echo "- **Mergeable State:** $mergeable_display" >> $GITHUB_STEP_SUMMARY
+          # echo "- **Mergeable State:** $mergeable_display" >> $GITHUB_STEP_SUMMARY
           echo "- **Approvals:** $approval_display" >> $GITHUB_STEP_SUMMARY
           echo "- **Change Requests:** \`$change_requests_count\`" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
