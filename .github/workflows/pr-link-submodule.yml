@@ -162,12 +162,7 @@ jobs:
 
             echo "🔎 Processing $owner/$repo at $path"
 
-            # Build authenticated URL
-            auth_url="https://${GH_TOKEN}@github.com/${owner}/${repo}.git"
-
-            # Clone the submodule repo with token
-            git clone "$auth_url" "$repo"
-            cd "$repo"
+            cd "$path"
 
             # Ensure we're on default branch (fetch all first)
             git fetch origin --prune
