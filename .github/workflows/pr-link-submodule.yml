@@ -9,6 +9,10 @@ on:
       - master
       - develop  # Add your target branches here
 
+env:
+  CROSS_TOKEN: ${{ secrets.WORKFLOWS }}
+  GH_TOKEN: ${{ secrets.WORKFLOWS }}
+
 jobs:
   # Job 1: Checkout once and discover all submodules
   discover-submodules:
@@ -17,6 +21,7 @@ jobs:
     outputs:
       matrix: ${{ steps.submodule.outputs.matrix }}
       has-submodules: ${{ steps.submodule.outputs.has-submodules }}
+      submodules-json: ${{ steps.submodule.outputs.submodules-json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,6 +50,7 @@ jobs:
             echo "No submodules found in .gitmodules"
             echo "has-submodules=false" >> $GITHUB_OUTPUT
             echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            echo "submodules-json=[]" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -63,11 +69,14 @@ jobs:
             echo "### ✅ No submodule changes detected" >> $GITHUB_STEP_SUMMARY
             echo "has-submodules=false" >> $GITHUB_OUTPUT
             echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            echo "submodules-json=[]" >> $GITHUB_OUTPUT
             exit 0
           fi
 
           MATRIX_JSON="{\"include\":["
+          SUBMODULES_ARRAY="["
           FIRST=true
+          FIRST_ARRAY=true
           COUNT=0
 
           for SUBMODULE_PATH in $CHANGED_SUBMODULES; do
@@ -96,18 +105,30 @@ jobs:
 
             IFS='/' read -r owner repo <<< "$SUBMODULE_REPO"
 
+            # Build matrix entry
             if [[ $FIRST == true ]]; then
               FIRST=false
             else
               MATRIX_JSON="$MATRIX_JSON,"
             fi
-
             MATRIX_JSON="$MATRIX_JSON{\"path\":\"$SUBMODULE_PATH\",\"repo\":\"$SUBMODULE_REPO\",\"owner\":\"$owner\",\"repo_name\":\"$repo\",\"name\":\"$submodule_name\"}"
+
+            # Build array entry for the creation step
+            if [[ $FIRST_ARRAY == true ]]; then
+              FIRST_ARRAY=false
+            else
+              SUBMODULES_ARRAY="$SUBMODULES_ARRAY,"
+            fi
+            SUBMODULES_ARRAY="$SUBMODULES_ARRAY{\"path\":\"$SUBMODULE_PATH\",\"url\":\"$SUBMODULE_URL\"}"
+
             COUNT=$((COUNT + 1))
           done
 
           MATRIX_JSON="$MATRIX_JSON]}"
+          SUBMODULES_ARRAY="$SUBMODULES_ARRAY]"
+          
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+          echo "submodules-json=$SUBMODULES_ARRAY" >> $GITHUB_OUTPUT
 
           if [[ $COUNT -gt 0 ]]; then
             echo "has-submodules=true" >> $GITHUB_OUTPUT
@@ -117,6 +138,105 @@ jobs:
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "### Found $COUNT changed submodules" >> $GITHUB_STEP_SUMMARY
           echo "Matrix JSON: $MATRIX_JSON"
+          echo "Submodules JSON: $SUBMODULES_ARRAY"
+
+      - name: Create submodule PRs
+        id: create
+        if: ${{ steps.submodule.outputs.has-submodules == 'true' }}
+        run: |
+          branch="${{ github.head_ref }}"
+          pr_number=${{ github.event.pull_request.number }}
+
+          # Create a temporary file for the submodules JSON
+          echo '${{ steps.submodule.outputs.submodules-json }}' > submodules.json
+
+          jq -c '.[]' submodules.json | while read sub; do
+            path=$(jq -r .path <<< "$sub")
+            url=$(jq -r .url <<< "$sub")
+
+            # Normalize URL (convert git@ to https://)
+            clean_url=${url/git@github.com:/https:\/\/github.com\/}
+            clean_url=${clean_url%.git}
+            repo=$(basename "$clean_url")
+            owner=$(basename "$(dirname "$clean_url")")
+
+            echo "🔎 Processing $owner/$repo at $path"
+
+            # Build authenticated URL
+            auth_url="https://${GH_TOKEN}@github.com/${owner}/${repo}.git"
+
+            # Clone the submodule repo with token
+            git clone "$auth_url" "$repo"
+            cd "$repo"
+
+            # Ensure we're on default branch (fetch all first)
+            git fetch origin --prune
+            git checkout main || git checkout master || git checkout -b main origin/main || git checkout -b main origin/master
+
+            # Create or reuse branch with same name as base PR
+            if git ls-remote --exit-code origin "refs/heads/$branch"; then
+              echo "✅ Branch $branch already exists in $repo"
+              git fetch origin $branch
+              git checkout $branch
+            else
+              echo "🌱 Creating new branch $branch in $repo"
+              git checkout -b "$branch"
+              git push origin "$branch"
+            fi
+
+            # Create or reuse a PR in the submodule
+            pr_url=$(gh pr create \
+              --title "Sync from base PR #$pr_number" \
+              --body "This PR was automatically created from ${{ github.repository }}#${pr_number}" \
+              --head "$branch" \
+              --base main \
+              --repo "${owner}/${repo}" 2>/dev/null || echo "")
+
+            pr_num=null
+            if [[ "$pr_url" == https* ]]; then
+              pr_num=$(basename "$pr_url")
+              echo "✅ Created PR #$pr_num in $owner/$repo"
+            else
+              # try to fetch existing PR number if creation failed
+              existing=$(gh pr list --head "$branch" --base main --repo "${owner}/${repo}" --json number -q '.[0].number' 2>/dev/null || echo "")
+              if [[ -n "$existing" && "$existing" != "null" ]]; then
+                pr_num=$existing
+                echo "✅ Found existing PR #$pr_num in $owner/$repo"
+              else
+                # Try with master as base branch
+                existing=$(gh pr list --head "$branch" --base master --repo "${owner}/${repo}" --json number -q '.[0].number' 2>/dev/null || echo "")
+                if [[ -n "$existing" && "$existing" != "null" ]]; then
+                  pr_num=$existing
+                  echo "✅ Found existing PR #$pr_num in $owner/$repo (master branch)"
+                else
+                  echo "❌ Failed to create or find PR in $owner/$repo"
+                fi
+              fi
+            fi
+
+            cd ..
+
+            # Update JSON entry with pr_number
+            tmp=$(mktemp)
+            jq --arg path "$path" \
+               --arg url "$url" \
+               --arg repo "$repo" \
+               --argjson pr_number "$pr_num" \
+               'map(if .path == $path then . + {pr_number: $pr_number} else . end)' \
+               submodules.json > "$tmp" && mv "$tmp" submodules.json
+          done
+
+          # Output final JSON with PR numbers
+          {
+            echo "final-json<<EOF"
+            cat submodules.json
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "### 🚀 Created PRs in submodules:" >> $GITHUB_STEP_SUMMARY
+          jq -r '.[] | "- \(.path): PR #\(.pr_number // "failed") in \(.url)"' submodules.json >> $GITHUB_STEP_SUMMARY
+        env:
+          GH_TOKEN: ${{ env.GH_TOKEN }}
 
   # Job 2: Process each submodule in parallel (PR linking, etc.)      
   link-and-validate:
