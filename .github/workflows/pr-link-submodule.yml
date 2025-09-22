@@ -223,7 +223,7 @@ jobs:
 
           # Output final JSON with PR numbers
           {
-            echo "final-json<<EOF"
+            echo "final_json<<EOF"
             cat submodules.json
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
@@ -232,7 +232,7 @@ jobs:
           jq -r '.[] | "- \(.path): PR #\(.pr_number // "failed") in \(.url)"' submodules.json >> $GITHUB_STEP_SUMMARY
         env:
           GH_TOKEN: ${{ env.GH_TOKEN }}
-          
+
       - name: Post submodule list as PR comment
         uses: actions/github-script@v7
         with:
