@@ -119,7 +119,7 @@ jobs:
             else
               SUBMODULES_ARRAY="$SUBMODULES_ARRAY,"
             fi
-            SUBMODULES_ARRAY="$SUBMODULES_ARRAY{\"path\":\"$SUBMODULE_PATH\",\"url\":\"$SUBMODULE_URL\"}"
+            SUBMODULES_ARRAY="$SUBMODULES_ARRAY{\"name\":\"$submodule_name\",\"path\":\"$SUBMODULE_PATH\",\"url\":\"$SUBMODULE_URL\"}"
 
             COUNT=$((COUNT + 1))
           done
