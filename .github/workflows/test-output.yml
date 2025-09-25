@@ -9,7 +9,7 @@ jobs:
     outputs:
       result: ${{ steps.echo.outputs.data }}
     steps:
-      - name: Echo hello_world
+      - name: Echo hello_world (from branch)
         id: echo
         run: echo "data=hello_world" >> $GITHUB_OUTPUT
 
