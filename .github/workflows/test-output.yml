@@ -1,0 +1,17 @@
+name: Test Output
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.echo.outputs.data }}
+    steps:
+      - name: Echo hello_world
+        id: echo
+        run: echo "data=hello_world" >> $GITHUB_OUTPUT
+
+      - name: Print for debug
+        run: echo "Result is ${{ steps.echo.outputs.data }}"
